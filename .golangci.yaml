@@ -1,0 +1,58 @@
+run:
+  timeout: 5m
+
+linters-settings:
+  dupl:
+    threshold: 100
+  gci:
+    custom-order: true
+    sections:
+      - standard
+      - default
+      - prefix(github.com/tlipoca9/yevna)
+      - blank
+      - dot
+  gocognit:
+    min-complexity: 20
+  gocyclo:
+    min-complexity: 20
+  gofmt:
+    simplify: true
+    rewrite-rules:
+      - pattern: 'interface{}'
+        replacement: 'any'
+  goimports:
+    local-prefixes: github.com/tlipoca9/yevna
+  tagliatelle:
+    case:
+      use-field-name: true
+      rules:
+        json: snake
+        yaml: snake
+        toml: snake
+        mapstructure: snake
+
+linters:
+  enable:
+    - asasalint
+    - dupl
+    - errcheck
+    - gci
+    - gocognit
+    - goconst
+    - gocyclo
+    - gofmt
+    - goimports
+    - gosimple
+    - gosec
+    - govet
+    - lll
+    - revive
+    - sloglint
+    - staticcheck
+    - stylecheck
+    - tagalign
+    - tagliatelle
+    - usestdlibvars
+    - unconvert
+    - unused
