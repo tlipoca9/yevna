@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"github.com/go-viper/mapstructure/v2"
-	"github.com/pterm/pterm"
-	"github.com/tlipoca9/yevna/parser"
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/go-viper/mapstructure/v2"
+	"github.com/pterm/pterm"
+
+	"github.com/tlipoca9/yevna/parser"
 )
 
 var GlobalOptions Options
@@ -29,18 +31,6 @@ func (o *Options) Quiet() {
 func (o *Options) Verbose() {
 	o.quiet = func() bool {
 		return false
-	}
-}
-
-func (o *Options) lazyInit() {
-	if o.quiet == nil {
-		o.quiet = GlobalOptions.quiet
-	}
-	if o.print == nil {
-		o.print = GlobalOptions.print
-	}
-	if o.cmdStr == nil {
-		o.cmdStr = GlobalOptions.cmdStr
 	}
 }
 
@@ -72,31 +62,60 @@ func init() {
 }
 
 type Cmd struct {
-	Options
-	cmd *exec.Cmd
+	cmd         *exec.Cmd
+	pipeProcess *Cmd
 
+	Err error
+	Options
 	parser        parser.Parser
 	decoderConfig *mapstructure.DecoderConfig
 }
 
 func Command(ctx context.Context, name string, args ...string) *Cmd {
 	if len(name) == 0 {
-		panic("name is required, but got empty string")
+		return &Cmd{Err: errors.New("name is required, but got empty string")}
 	}
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	return &Cmd{cmd: cmd}
+	return &Cmd{
+		cmd: cmd,
+		Options: Options{
+			quiet:  GlobalOptions.quiet,
+			print:  GlobalOptions.print,
+			cmdStr: GlobalOptions.cmdStr,
+		},
+	}
+}
+
+func Pipe(ctx context.Context, cmds ...[]string) *Cmd {
+	if len(cmds) == 0 {
+		return &Cmd{Err: errors.New("at least one command is required")}
+	}
+
+	c := Command(ctx, cmds[0][0], cmds[0][1:]...)
+	for i := 1; i < len(cmds); i++ {
+		c = c.Pipe(ctx, cmds[i][0], cmds[i][1:]...)
+	}
+
+	return c
 }
 
 func (c *Cmd) Quiet() *Cmd {
+	if c.Err != nil {
+		return c
+	}
+
 	c.Options.Quiet()
 	return c
 }
 
 func (c *Cmd) printCmd() {
-	c.lazyInit()
+	if c.Err != nil {
+		return
+	}
+
 	if c.Options.quiet() {
 		return
 	}
@@ -104,43 +123,149 @@ func (c *Cmd) printCmd() {
 }
 
 func (c *Cmd) WithParser(p parser.Parser) *Cmd {
+	if c.Err != nil {
+		return c
+	}
+
 	c.parser = p
 	return c
 }
 
 func (c *Cmd) WithDecoderConfig(dc mapstructure.DecoderConfig) *Cmd {
+	if c.Err != nil {
+		return c
+	}
+
 	c.decoderConfig = &dc
 	return c
 }
 
-func (c *Cmd) Run() error {
-	c.lazyInit()
-	c.printCmd()
+func (c *Cmd) Run() *Cmd {
+	if c.Err != nil {
+		return c
+	}
 
 	if c.parser != nil {
 		if c.decoderConfig == nil {
-			return errors.New("DecodeConfig is required when Parser is set")
+			c.Err = errors.New("DecodeConfig is required when Parser is set")
+			return c
 		}
 		c.cmd.Stdout = nil
 		rd, err := c.cmd.StdoutPipe()
 		if err != nil {
-			return err
+			c.Err = err
+			return c
 		}
 		defer rd.Close()
-		err = c.cmd.Start()
-		if err != nil {
-			return err
+		if c.start().Err != nil {
+			return c
 		}
 		data, err := c.parser.Parse(rd)
 		if err != nil {
-			return err
+			c.Err = err
+			return c
 		}
 		dec, err := mapstructure.NewDecoder(c.decoderConfig)
 		if err != nil {
-			return err
+			c.Err = err
+			return c
 		}
-		return dec.Decode(data)
+
+		err = dec.Decode(data)
+		if err != nil {
+			c.Err = err
+			return c
+		}
+
+		return c.wait()
 	}
 
-	return c.cmd.Run()
+	return c.start().wait()
+}
+
+func (c *Cmd) start() *Cmd {
+	if c.Err != nil {
+		return c
+	}
+
+	// start all the processes in the pipeline
+	var processes []*Cmd
+	for i := c.pipeProcess; i != nil; i = i.pipeProcess {
+		processes = append(processes, i)
+	}
+
+	var err error
+	for i := len(processes) - 1; i >= 0; i-- {
+		processes[i].printCmd()
+		err = processes[i].cmd.Start()
+		if err != nil {
+			break
+		}
+	}
+	for i := len(processes) - 1; i >= 0; i-- {
+		processes[i].Err = err
+	}
+	if err != nil {
+		c.Err = err
+		return c
+	}
+
+	c.printCmd()
+	c.Err = c.cmd.Start()
+	return c
+}
+
+func (c *Cmd) wait() *Cmd {
+	if c.Err != nil {
+		return c
+	}
+
+	// wait for all the processes in the pipeline
+	var processes []*Cmd
+	for i := c.pipeProcess; i != nil; i = i.pipeProcess {
+		processes = append(processes, i)
+	}
+	var err error
+	for i := len(processes) - 1; i >= 0; i-- {
+		err = processes[i].cmd.Wait()
+		if err != nil {
+			break
+		}
+	}
+	for i := len(processes) - 1; i >= 0; i-- {
+		processes[i].Err = err
+	}
+	if err != nil {
+		c.Err = err
+		return c
+	}
+
+	c.Err = c.cmd.Wait()
+	return c
+}
+
+func (c *Cmd) Pipe(ctx context.Context, name string, args ...string) *Cmd {
+	if c.Err != nil {
+		return c
+	}
+
+	if c.parser != nil {
+		return &Cmd{Err: errors.New("cannot pipe after setting a parser")}
+	}
+	if len(name) == 0 {
+		return &Cmd{Err: errors.New("name is required, but got empty string")}
+	}
+
+	c.cmd.Stdout = nil
+
+	prevStdout, err := c.cmd.StdoutPipe()
+	if err != nil {
+		c.Err = err
+		return c
+	}
+
+	nextC := Command(ctx, name, args...)
+	nextC.pipeProcess = c
+	nextC.cmd.Stdin = prevStdout
+	return nextC
 }

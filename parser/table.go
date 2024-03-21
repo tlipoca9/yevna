@@ -33,7 +33,6 @@ func (t *tableParser) Parse(r io.Reader) (any, error) {
 	if len(lines) == 0 {
 		return nil, nil
 	}
-
 	for i, line := range lines {
 		if len(line) < maxLength {
 			lines[i] = line + strings.Repeat(" ", maxLength-len(line))
@@ -41,14 +40,23 @@ func (t *tableParser) Parse(r io.Reader) (any, error) {
 		lines[i] += "\n"
 	}
 
+	// find the headers
 	headerTxt := lines[0]
+	headersMap := make([]bool, maxLength+1)
+	for _, line := range lines {
+		for i, c := range line {
+			if !unicode.IsSpace(c) {
+				headersMap[i] = true
+			}
+		}
+	}
 	i := 0
-	for idx, c := range headerTxt {
-		if i != -1 && unicode.IsSpace(c) {
+	for idx, v := range headersMap {
+		if i != -1 && !v {
 			headers = append(headers, [2]int{i, idx})
 			i = -1
 		}
-		if i == -1 && !unicode.IsSpace(c) {
+		if i == -1 && v {
 			i = idx
 		}
 	}
@@ -56,6 +64,7 @@ func (t *tableParser) Parse(r io.Reader) (any, error) {
 		return nil, errors.New("invalid table header")
 	}
 
+	// parse the table
 	ret := make([]map[string]any, 0)
 	for _, line := range lines[1:] {
 		v := make(map[string]any, len(headers))

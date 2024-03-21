@@ -1,8 +1,9 @@
 package parser
 
 import (
-	"github.com/joho/godotenv"
 	"io"
+
+	"github.com/joho/godotenv"
 )
 
 type dotenvParser struct{}
