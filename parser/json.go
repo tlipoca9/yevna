@@ -1,24 +1,34 @@
 package parser
 
 import (
+	"io"
+
 	"github.com/goccy/go-json"
 )
 
-func JSONObject() Parser {
-	return JSON(Object)
+type JSONParserBuilder struct {
+	data commonParser
 }
 
-func JSONArray() Parser {
-	return JSON(Array)
+func (b *JSONParserBuilder) DataType(t DataType) *JSONParserBuilder {
+	b.data.dataType = t
+	return b
 }
 
-func JSON(t ...DataType) Parser {
-	dt := Object
-	if len(t) > 0 {
-		dt = t[0]
+func (b *JSONParserBuilder) Build() Parser {
+	if b.data.unmarshal == nil {
+		b.data.unmarshal = json.Unmarshal
 	}
-	return &CommonParser{
-		Unmarshal: json.Unmarshal,
-		DataType:  dt,
+	if b.data.dataType == 0 {
+		b.data.dataType = Object
 	}
+	return &b.data
+}
+
+func (b *JSONParserBuilder) Parse(r io.Reader) (any, error) {
+	return b.Build().Parse(r)
+}
+
+func JSON() *JSONParserBuilder {
+	return &JSONParserBuilder{}
 }

@@ -10,10 +10,6 @@ import (
 
 type tableParser struct{}
 
-func Table() Parser {
-	return &tableParser{}
-}
-
 func (t *tableParser) Parse(r io.Reader) (any, error) {
 	headers := make([][2]int, 0)
 	scanner := bufio.NewScanner(r)
@@ -75,4 +71,20 @@ func (t *tableParser) Parse(r io.Reader) (any, error) {
 	}
 
 	return ret, nil
+}
+
+type TableParserBuilder struct {
+	data tableParser
+}
+
+func (b *TableParserBuilder) Build() Parser {
+	return &b.data
+}
+
+func (b *TableParserBuilder) Parse(r io.Reader) (any, error) {
+	return b.Build().Parse(r)
+}
+
+func Table() *TableParserBuilder {
+	return &TableParserBuilder{}
 }

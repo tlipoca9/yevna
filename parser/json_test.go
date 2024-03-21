@@ -34,7 +34,7 @@ func TestJSONObject(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			p := parser.JSONObject()
+			p := parser.JSON()
 			got, err := p.Parse(strings.NewReader(c.input))
 			if c.err && err == nil {
 				t.Fatalf("expected error, got nil")
@@ -90,7 +90,7 @@ func TestJSONArray(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			p := parser.JSONArray()
+			p := parser.JSON().DataType(parser.Array)
 			got, err := p.Parse(strings.NewReader(c.input))
 			if c.err && err == nil {
 				t.Fatalf("expected error, got nil")

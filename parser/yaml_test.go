@@ -34,7 +34,7 @@ func TestYAMLObject(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			p := parser.YAMLObject()
+			p := parser.YAML()
 			got, err := p.Parse(strings.NewReader(c.input))
 			if c.err && err == nil {
 				t.Fatalf("expected error, got nil")
@@ -75,7 +75,7 @@ func TestYAMLArray(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			p := parser.YAMLArray()
+			p := parser.YAML().DataType(parser.Array)
 			got, err := p.Parse(strings.NewReader(c.input))
 			if c.err && err == nil {
 				t.Fatalf("expected error, got nil")

@@ -8,10 +8,22 @@ import (
 
 type dotenvParser struct{}
 
-func Dotenv() Parser {
-	return &dotenvParser{}
-}
-
 func (dotenvParser) Parse(r io.Reader) (any, error) {
 	return godotenv.Parse(r)
+}
+
+type DotenvParserBuilder struct {
+	data dotenvParser
+}
+
+func (b *DotenvParserBuilder) Build() Parser {
+	return &b.data
+}
+
+func (b *DotenvParserBuilder) Parse(r io.Reader) (any, error) {
+	return b.Build().Parse(r)
+}
+
+func Dotenv() *DotenvParserBuilder {
+	return &DotenvParserBuilder{}
 }
