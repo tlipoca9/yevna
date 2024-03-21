@@ -1,91 +1,66 @@
 package parser_test
 
 import (
-	"reflect"
 	"strings"
-	"testing"
 
 	"github.com/tlipoca9/yevna/parser"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-func TestYAMLObject(t *testing.T) {
-	cases := []struct {
-		name     string
-		input    string
-		expected any
-		err      bool
-	}{
-		{
-			name:     "empty",
-			input:    "",
-			expected: map[string]any{},
-		},
-		{
-			name:     "simple",
-			input:    "FOO: BAR\n",
-			expected: map[string]any{"FOO": "BAR"},
-		},
-		{
-			name:     "multiline",
-			input:    "FOO: BAR\nBAZ: QUX\n",
-			expected: map[string]any{"FOO": "BAR", "BAZ": "QUX"},
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			p := parser.YAML()
-			got, err := p.Parse(strings.NewReader(c.input))
-			if c.err && err == nil {
-				t.Fatalf("expected error, got nil")
-			}
-			if !c.err && err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if !reflect.DeepEqual(got, c.expected) {
-				t.Fatalf("expected: %v, got: %v", c.expected, got)
-			}
+var _ = Describe("YAMLParser", func() {
+	Context("Object", func() {
+		p := parser.YAML()
+		When("input is empty", func() {
+			It("return empty object", func() {
+				got, err := p.Parse(strings.NewReader(""))
+				Expect(err).To(BeNil())
+				Expect(got).To(BeEmpty())
+			})
 		})
-	}
-}
 
-func TestYAMLArray(t *testing.T) {
-	cases := []struct {
-		name     string
-		input    string
-		expected any
-		err      bool
-	}{
-		{
-			name:     "empty",
-			input:    "[]",
-			expected: []any{},
-		},
-		{
-			name:     "simple",
-			input:    "- FOO\n",
-			expected: []any{"FOO"},
-		},
-		{
-			name:     "multiline",
-			input:    "- FOO\n- BAR\n",
-			expected: []any{"FOO", "BAR"},
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			p := parser.YAML().DataType(parser.Array)
-			got, err := p.Parse(strings.NewReader(c.input))
-			if c.err && err == nil {
-				t.Fatalf("expected error, got nil")
-			}
-			if !c.err && err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if !reflect.DeepEqual(got, c.expected) {
-				t.Fatalf("expected: %v, got: %v", c.expected, got)
-			}
+		When("input is simple", func() {
+			It("return expected object", func() {
+				got, err := p.Parse(strings.NewReader("FOO: BAR\n"))
+				Expect(err).To(BeNil())
+				Expect(got).To(Equal(map[string]any{"FOO": "BAR"}))
+			})
 		})
-	}
-}
+
+		When("input is multiline", func() {
+			It("return expected object", func() {
+				got, err := p.Parse(strings.NewReader("FOO: BAR\nBAZ: QUX\n"))
+				Expect(err).To(BeNil())
+				Expect(got).To(Equal(map[string]any{"FOO": "BAR", "BAZ": "QUX"}))
+			})
+		})
+	})
+
+	Context("Array", func() {
+		p := parser.YAML().DataType(parser.Array)
+		When("input is empty", func() {
+			It("return empty object", func() {
+				got, err := p.Parse(strings.NewReader("[]"))
+				Expect(err).To(BeNil())
+				Expect(got).To(BeEmpty())
+			})
+		})
+
+		When("input is simple", func() {
+			It("return expected object", func() {
+				got, err := p.Parse(strings.NewReader("- FOO\n"))
+				Expect(err).To(BeNil())
+				Expect(got).To(Equal([]any{"FOO"}))
+			})
+		})
+
+		When("input is multiline", func() {
+			It("return expected object", func() {
+				got, err := p.Parse(strings.NewReader("- FOO\n- BAR\n"))
+				Expect(err).To(BeNil())
+				Expect(got).To(Equal([]any{"FOO", "BAR"}))
+			})
+		})
+	})
+})

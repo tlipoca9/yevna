@@ -1,28 +1,34 @@
 package parser_test
 
 import (
-	"reflect"
+	"io"
 	"strings"
-	"testing"
+	"time"
+
+	"github.com/onsi/gomega/gmeasure"
 
 	"github.com/tlipoca9/yevna/parser"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-func TestTable(t *testing.T) {
-	cases := []struct {
-		name     string
-		input    string
-		expected any
-		err      bool
-	}{
-		{
-			name:     "empty",
-			input:    "",
-			expected: nil,
-		},
-		{
-			name: "eza -l --header",
-			input: `Permissions Size User Date Modified Name
+var _ = Describe("TableParser", func() {
+	When("input is empty", func() {
+		It("return empty object", func() {
+			p := parser.Table()
+			got, err := p.Parse(strings.NewReader(""))
+			Expect(err).To(BeNil())
+			Expect(got).To(BeEmpty())
+			Expect(len(got.([]map[string]any))).To(Equal(cap(got.([]map[string]any))))
+		})
+	})
+
+	When("input is eza -l --header", func() {
+		It("return expected object", func() {
+			p := parser.Table()
+			got, err := p.Parse(strings.NewReader(`
+Permissions Size User Date Modified Name
 drwxr-xr-x     - foo  21 Mar 09:58  cmd
 drwxr-xr-x     - foo  21 Mar 09:42  cmdx
 drwxr-xr-x     - foo  21 Mar 10:03  execx
@@ -31,8 +37,9 @@ drwxr-xr-x     - foo  21 Mar 10:03  execx
 .rw-r--r--   342 foo  21 Mar 09:59  main.go
 .rw-r--r--   132 foo  21 Mar 09:42  Makefile
 drwxr-xr-x     - foo  21 Mar 10:50  parser
-`,
-			expected: []map[string]any{
+`[1:]))
+			Expect(err).To(BeNil())
+			Expect(got).To(Equal([]map[string]any{
 				{
 					"Permissions":   "drwxr-xr-x",
 					"Size":          "-",
@@ -89,11 +96,16 @@ drwxr-xr-x     - foo  21 Mar 10:50  parser
 					"Date Modified": "21 Mar 10:50",
 					"Name":          "parser",
 				},
-			},
-		},
-		{
-			name: "kubectl get pods",
-			input: `NAME                                                              READY   STATUS                       RESTARTS            AGE
+			}))
+			Expect(len(got.([]map[string]any))).To(Equal(cap(got.([]map[string]any))))
+		})
+	})
+
+	When("input is kubectl get pods", func() {
+		It("return expected object", func() {
+			p := parser.Table()
+			got, err := p.Parse(strings.NewReader(`
+NAME                                                              READY   STATUS                       RESTARTS            AGE
 foofoofoofoofoofoofoofoo-74bc6cbf96-wgxn8                         1/1     Running                      0                   2d13h
 foofoofoofoofoofoofoofoofoofoof-66b86b4ccf-7mnzd                  0/1     CrashLoopBackOff             495 (4m13s ago)     42h
 foofoofoofoofoofoofoofoofoofoof-66b86b4ccf-lckbm                  0/1     CrashLoopBackOff             9063 (3m4s ago)     39d
@@ -103,8 +115,9 @@ foofoof-7c65b8458c-wmxc2                                          1/1     Runnin
 foofoofoofoofoofoo-6ff6f5c957-9rmtv                               1/1     Running                      0                   40h
 foofoofoofoofoofoofoofoofoofoof-28516525-sfb8g                    0/1     Completed                    0                   13m
 foofoofoofoofoofoofoofoofoofoof-28516530-sxr74                    0/1     Completed                    0                   8m9s
-`,
-			expected: []map[string]any{
+`[1:]))
+			Expect(err).To(BeNil())
+			Expect(got).To(Equal([]map[string]any{
 				{
 					"NAME":     "foofoofoofoofoofoofoofoo-74bc6cbf96-wgxn8",
 					"READY":    "1/1",
@@ -168,74 +181,60 @@ foofoofoofoofoofoofoofoofoofoof-28516530-sxr74                    0/1     Comple
 					"RESTARTS": "0",
 					"AGE":      "8m9s",
 				},
-			},
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			p := parser.Table()
-			got, err := p.Parse(strings.NewReader(c.input))
-			if c.err && err == nil {
-				t.Fatalf("expected error, got nil")
-			}
-			if !c.err && err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if !reflect.DeepEqual(got, c.expected) {
-				t.Fatalf("expected: %v, got: %v", c.expected, got)
-			}
+			}))
+			Expect(len(got.([]map[string]any))).To(Equal(cap(got.([]map[string]any))))
 		})
-	}
-}
+	})
+})
 
-func benchmarkTable(i int, b *testing.B) {
+func generateTableBenchmarkInput(i int) io.Reader {
 	input := "Permissions Size User Date Modified Name\n"
-	input += strings.Repeat(`drwxr-xr-x     - foo  21 Mar 09:42  cmdx
+	input += strings.Repeat(`
+drwxr-xr-x     - foo  21 Mar 09:42  cmdx
 drwxr-xr-x     - foo  21 Mar 10:03  execx
 .rw-r--r--  1.0k foo  21 Mar 10:11  go.mod
 .rw-r--r--   12k foo  21 Mar 10:11  go.sum
 .rw-r--r--   342 foo  21 Mar 09:59  main.go
 .rw-r--r--   132 foo  21 Mar 09:42  Makefile
 drwxr-xr-x     - foo  21 Mar 10:50  parser
-`, i)
-	p := parser.Table()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, err := p.Parse(strings.NewReader(input))
-		if err != nil {
-			b.Fatalf("unexpected error: %v", err)
-		}
-	}
+`[1:], i)
+	return strings.NewReader(input)
 }
 
-func BenchmarkTable_10(b *testing.B)    { benchmarkTable(10, b) }
-func BenchmarkTable_100(b *testing.B)   { benchmarkTable(100, b) }
-func BenchmarkTable_1000(b *testing.B)  { benchmarkTable(1000, b) }
-func BenchmarkTable_10000(b *testing.B) { benchmarkTable(10000, b) }
+var _ = Describe("Benchmark TableParser", func() {
+	It("benchmark 1e2", Serial, Label("parser", "table", "benchmark"), func() {
+		experiment := gmeasure.NewExperiment("benchmark_table_1e2")
+		AddReportEntry(experiment.Name, experiment)
+		experiment.Sample(func(_ int) {
+			r, p := generateTableBenchmarkInput(1e2), parser.Table()
+			experiment.MeasureDuration("parse", func() {
+				_, err := p.Parse(r)
+				Expect(err).To(BeNil())
+			})
+		}, gmeasure.SamplingConfig{N: 1e3, Duration: time.Second})
+	})
 
-func benchmarkTable2(i int, b *testing.B) {
-	input := "NAME                                                              READY   STATUS                       RESTARTS            AGE\n"
-	input += strings.Repeat(`foofoofoofoofoofoofoofoofoofoof-66b86b4ccf-7mnzd                  0/1     CrashLoopBackOff             495 (4m13s ago)     42h
-foofoofoofoofoofoofoofoofoofoof-66b86b4ccf-lckbm                  0/1     CrashLoopBackOff             9063 (3m4s ago)     39d
-foofoofoofoofoofoofoofoofoofoof-785fc5694b-82cll                  0/1     CrashLoopBackOff             734 (52s ago)       2d15h
-foofoofoofoofoofoofoofoofoofoof-785fc5694b-r766g                  0/1     CrashLoopBackOff             472 (4m53s ago)     40h
-foofoof-7c65b8458c-wmxc2                                          1/1     Running                      0                   40h
-foofoofoofoofoofoo-6ff6f5c957-9rmtv                               1/1     Running                      0                   40h
-foofoofoofoofoofoofoofoofoofoof-28516525-sfb8g                    0/1     Completed                    0                   13m
-foofoofoofoofoofoofoofoofoofoof-28516530-sxr74                    0/1     Completed                    0                   8m9s
-`, i)
-	p := parser.Table()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, err := p.Parse(strings.NewReader(input))
-		if err != nil {
-			b.Fatalf("unexpected error: %v", err)
-		}
-	}
-}
+	It("benchmark 1e3", Serial, Label("parser", "table", "benchmark"), func() {
+		experiment := gmeasure.NewExperiment("benchmark_table_1e3")
+		AddReportEntry(experiment.Name, experiment)
+		experiment.Sample(func(_ int) {
+			r, p := generateTableBenchmarkInput(1e3), parser.Table()
+			experiment.MeasureDuration("parse", func() {
+				_, err := p.Parse(r)
+				Expect(err).To(BeNil())
+			})
+		}, gmeasure.SamplingConfig{N: 1e3, Duration: time.Second})
+	})
 
-func BenchmarkTable2_10(b *testing.B)    { benchmarkTable2(10, b) }
-func BenchmarkTable2_100(b *testing.B)   { benchmarkTable2(100, b) }
-func BenchmarkTable2_1000(b *testing.B)  { benchmarkTable2(1000, b) }
-func BenchmarkTable2_10000(b *testing.B) { benchmarkTable2(10000, b) }
+	It("benchmark 1e4", Serial, Label("parser", "table", "benchmark"), func() {
+		experiment := gmeasure.NewExperiment("benchmark_table_1e4")
+		AddReportEntry(experiment.Name, experiment)
+		experiment.Sample(func(_ int) {
+			r, p := generateTableBenchmarkInput(1e4), parser.Table()
+			experiment.MeasureDuration("parse", func() {
+				_, err := p.Parse(r)
+				Expect(err).To(BeNil())
+			})
+		}, gmeasure.SamplingConfig{N: 1e3, Duration: time.Second})
+	})
+})

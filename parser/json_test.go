@@ -1,106 +1,90 @@
 package parser_test
 
 import (
-	"reflect"
 	"strings"
-	"testing"
 
 	"github.com/tlipoca9/yevna/parser"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-func TestJSONObject(t *testing.T) {
-	cases := []struct {
-		name     string
-		input    string
-		expected any
-		err      bool
-	}{
-		{
-			name:     "empty",
-			input:    "{}",
-			expected: map[string]any{},
-		},
-		{
-			name:     "simple",
-			input:    `{"FOO":"BAR"}`,
-			expected: map[string]any{"FOO": "BAR"},
-		},
-		{
-			name:     "multiline",
-			input:    `{"FOO":"BAR","BAZ":"QUX"}`,
-			expected: map[string]any{"FOO": "BAR", "BAZ": "QUX"},
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			p := parser.JSON()
-			got, err := p.Parse(strings.NewReader(c.input))
-			if c.err && err == nil {
-				t.Fatalf("expected error, got nil")
-			}
-			if !c.err && err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if !reflect.DeepEqual(got, c.expected) {
-				t.Fatalf("expected: %v, got: %v", c.expected, got)
-			}
+var _ = Describe("JSONParser", func() {
+	Context("Object", func() {
+		p := parser.JSON()
+		When("input is empty", func() {
+			It("return empty object", func() {
+				got, err := p.Parse(strings.NewReader("{}"))
+				Expect(err).To(BeNil())
+				Expect(got).To(BeEmpty())
+			})
 		})
-	}
-}
 
-func TestJSONArray(t *testing.T) {
-	cases := []struct {
-		name     string
-		input    string
-		expected any
-		err      bool
-	}{
-		{
-			name:     "empty",
-			input:    "[]",
-			expected: []any{},
-		},
-		{
-			name:     "simple",
-			input:    `["FOO"]`,
-			expected: []any{"FOO"},
-		},
-		{
-			name:     "multiline",
-			input:    `["FOO","BAR"]`,
-			expected: []any{"FOO", "BAR"},
-		},
-		{
-			name:     "nested",
-			input:    `[["FOO","BAR"],["BAZ","QUX"]]`,
-			expected: []any{[]any{"FOO", "BAR"}, []any{"BAZ", "QUX"}},
-		},
-		{
-			name:     "mixed",
-			input:    `["FOO",{"BAZ":"QUX"}]`,
-			expected: []any{"FOO", map[string]any{"BAZ": "QUX"}},
-		},
-		{
-			name:     "multi_object",
-			input:    `[{"FOO":"BAR"},{"BAZ":"QUX"}]`,
-			expected: []any{map[string]any{"FOO": "BAR"}, map[string]any{"BAZ": "QUX"}},
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			p := parser.JSON().DataType(parser.Array)
-			got, err := p.Parse(strings.NewReader(c.input))
-			if c.err && err == nil {
-				t.Fatalf("expected error, got nil")
-			}
-			if !c.err && err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if !reflect.DeepEqual(got, c.expected) {
-				t.Fatalf("expected: %v, got: %v", c.expected, got)
-			}
+		When("input is simple", func() {
+			It("return expected object", func() {
+				got, err := p.Parse(strings.NewReader(`{"FOO":"BAR"}`))
+				Expect(err).To(BeNil())
+				Expect(got).To(Equal(map[string]any{"FOO": "BAR"}))
+			})
 		})
-	}
-}
+
+		When("input is multiline", func() {
+			It("return expected object", func() {
+				got, err := p.Parse(strings.NewReader(`{"FOO":"BAR","BAZ":"QUX"}`))
+				Expect(err).To(BeNil())
+				Expect(got).To(Equal(map[string]any{"FOO": "BAR", "BAZ": "QUX"}))
+			})
+		})
+	})
+
+	Context("Array", func() {
+		p := parser.JSON().DataType(parser.Array)
+		When("input is empty", func() {
+			It("return empty object", func() {
+				got, err := p.Parse(strings.NewReader("[]"))
+				Expect(err).To(BeNil())
+				Expect(got).To(BeEmpty())
+			})
+		})
+
+		When("input is simple", func() {
+			It("return expected object", func() {
+				got, err := p.Parse(strings.NewReader(`["FOO"]`))
+				Expect(err).To(BeNil())
+				Expect(got).To(Equal([]any{"FOO"}))
+			})
+		})
+
+		When("input is multiline", func() {
+			It("return expected object", func() {
+				got, err := p.Parse(strings.NewReader(`["FOO","BAR"]`))
+				Expect(err).To(BeNil())
+				Expect(got).To(Equal([]any{"FOO", "BAR"}))
+			})
+		})
+
+		When("input is nested", func() {
+			It("return expected object", func() {
+				got, err := p.Parse(strings.NewReader(`[["FOO","BAR"],["BAZ","QUX"]]`))
+				Expect(err).To(BeNil())
+				Expect(got).To(Equal([]any{[]any{"FOO", "BAR"}, []any{"BAZ", "QUX"}}))
+			})
+		})
+
+		When("input is mixed", func() {
+			It("return expected object", func() {
+				got, err := p.Parse(strings.NewReader(`["FOO",{"BAZ":"QUX"}]`))
+				Expect(err).To(BeNil())
+				Expect(got).To(Equal([]any{"FOO", map[string]any{"BAZ": "QUX"}}))
+			})
+		})
+
+		When("input is multi_object", func() {
+			It("return expected object", func() {
+				got, err := p.Parse(strings.NewReader(`[{"FOO":"BAR"},{"BAZ":"QUX"}]`))
+				Expect(err).To(BeNil())
+				Expect(got).To(Equal([]any{map[string]any{"FOO": "BAR"}, map[string]any{"BAZ": "QUX"}}))
+			})
+		})
+	})
+})
