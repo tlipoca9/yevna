@@ -13,7 +13,8 @@ func main() {
 	defer cancel()
 
 	var res []map[string]any
-	err := yevna.Command(ctx, "echo", `Permissions Size User       Date Modified Name
+	err := yevna.Command(ctx, "echo", `
+Permissions Size User       Date Modified Name
 .rw-r--r--@ 139M foobarbazq 21 Mar 16:44  ca.txt
 drwxr-xr-x     - foobarbazq 21 Mar 16:44  cmd
 drwxr-xr-x     - foobarbazq 21 Mar 09:42  cmdx
@@ -23,7 +24,7 @@ drwxr-xr-x     - foobarbazq 21 Mar 17:36  execx
 .rw-r--r--   14k foobarbazq 21 Mar 17:29  go.sum
 .rw-r--r--   220 foobarbazq 21 Mar 15:51  Makefile
 drwxr-xr-x     - foobarbazq 21 Mar 17:29  parser
-.rw-r--r--  4.8k foobarbazq 21 Mar 17:22  yevna.go`).
+.rw-r--r--  4.8k foobarbazq 21 Mar 17:22  yevna.go`[1:]).
 		Quiet().
 		WithParser(parser.Table()).
 		WithDecoderConfig(mapstructure.DecoderConfig{Result: &res}).

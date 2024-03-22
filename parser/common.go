@@ -1,8 +1,9 @@
 package parser
 
 import (
-	"errors"
 	"io"
+
+	"github.com/cockroachdb/errors"
 )
 
 type commonParser struct {

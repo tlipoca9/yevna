@@ -1,9 +1,10 @@
 package cmdx
 
 import (
-	"errors"
 	"io/fs"
 	"os"
+
+	"github.com/cockroachdb/errors"
 )
 
 func FileExists(path string) (bool, error) {

@@ -2,10 +2,11 @@ package parser
 
 import (
 	"bufio"
-	"errors"
 	"io"
 	"strings"
 	"unicode"
+
+	"github.com/cockroachdb/errors"
 )
 
 type tableParser struct {

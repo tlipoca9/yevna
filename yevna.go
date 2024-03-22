@@ -3,11 +3,11 @@ package yevna
 import (
 	"bytes"
 	"context"
-	"errors"
 	"os"
 	"os/exec"
 	"strings"
 
+	"github.com/cockroachdb/errors"
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/pterm/pterm"
 
