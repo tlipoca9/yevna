@@ -38,7 +38,7 @@ var _ = Describe("YAMLParser", func() {
 	})
 
 	Context("Array", func() {
-		p := parser.YAML().DataType(parser.Array)
+		p := parser.YAML().WithDataType(parser.Array)
 		When("input is empty", func() {
 			It("return empty object", func() {
 				got, err := p.Parse(strings.NewReader("[]"))

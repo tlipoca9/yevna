@@ -4,60 +4,76 @@ import (
 	"io"
 
 	"github.com/cockroachdb/errors"
+	"github.com/goccy/go-json"
+	"github.com/goccy/go-yaml"
 )
 
-type commonParser struct {
-	unmarshal func([]byte, any) error
-	dataType  DataType
+type CommonParserOptions struct {
+	UnmarshalFunc func([]byte, any) error
+	DataType      DataType
 }
 
-func (p *commonParser) Parse(r io.Reader) (any, error) {
+type CommonParser struct {
+	opt CommonParserOptions
+}
+
+func (p *CommonParser) WithUnmarshalFunc(f func([]byte, any) error) *CommonParser {
+	p.opt.UnmarshalFunc = f
+	return p
+}
+
+func (p *CommonParser) WithDataType(t DataType) *CommonParser {
+	p.opt.DataType = t
+	return p
+}
+
+func (p *CommonParser) lazyInit() {
+	if p.opt.UnmarshalFunc == nil {
+		p.opt.UnmarshalFunc = json.Unmarshal
+	}
+	if p.opt.DataType == 0 {
+		p.opt.DataType = Object
+	}
+}
+
+func (p *CommonParser) Parse(r io.Reader) (any, error) {
+	p.lazyInit()
+
 	buf, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}
-	switch p.dataType {
+	switch p.opt.DataType {
 	case Object:
 		obj := make(map[string]any)
-		err = p.unmarshal(buf, &obj)
+		err = p.opt.UnmarshalFunc(buf, &obj)
 		if err != nil {
 			return nil, err
 		}
 		return obj, nil
 	case Array:
 		var arr []any
-		err = p.unmarshal(buf, &arr)
+		err = p.opt.UnmarshalFunc(buf, &arr)
 		if err != nil {
 			return nil, err
 		}
 		return arr, nil
 	default:
-		return nil, errors.New("invalid data type")
+		return nil, errors.New("invalid opt type")
 	}
 }
 
-type CommonParserBuilder struct {
-	data commonParser
+// Common returns a new CommonParser
+func Common() *CommonParser {
+	return &CommonParser{}
 }
 
-func (b *CommonParserBuilder) Unmarshal(f func([]byte, any) error) *CommonParserBuilder {
-	b.data.unmarshal = f
-	return b
+// JSON is the shortcut for Common().WithUnmarshalFunc(json.Unmarshal)
+func JSON() *CommonParser {
+	return Common().WithUnmarshalFunc(json.Unmarshal)
 }
 
-func (b *CommonParserBuilder) DataType(t DataType) *CommonParserBuilder {
-	b.data.dataType = t
-	return b
-}
-
-func (b *CommonParserBuilder) Build() Parser {
-	return &b.data
-}
-
-func (b *CommonParserBuilder) Parse(r io.Reader) (any, error) {
-	return b.Build().Parse(r)
-}
-
-func Common() *CommonParserBuilder {
-	return &CommonParserBuilder{}
+// YAML is the shortcut for Common().WithUnmarshalFunc(yaml.Unmarshal)
+func YAML() *CommonParser {
+	return Common().WithUnmarshalFunc(yaml.Unmarshal)
 }

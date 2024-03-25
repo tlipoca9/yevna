@@ -38,7 +38,7 @@ var _ = Describe("JSONParser", func() {
 	})
 
 	Context("Array", func() {
-		p := parser.JSON().DataType(parser.Array)
+		p := parser.JSON().WithDataType(parser.Array)
 		When("input is empty", func() {
 			It("return empty object", func() {
 				got, err := p.Parse(strings.NewReader("[]"))
