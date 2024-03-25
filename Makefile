@@ -1,7 +1,3 @@
-.PHONY: serve
-build: lint
-	go build -o bin/yevna
-
 .PHONY: lint
 lint:
 	go generate ./...
