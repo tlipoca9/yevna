@@ -59,7 +59,12 @@ linters-settings:
         disabled: false
         exclude: []
         arguments:
-          allowedPackages: ["github.com/onsi/ginkgo/v2","github.com/onsi/gomega"]
+          - allowedPackages: ["github.com/onsi/ginkgo/v2","github.com/onsi/gomega"]
+      - name: function-length
+        severity: warning
+        disabled: false
+        exclude: []
+        arguments: [0, 99]
 
 linters:
   enable:

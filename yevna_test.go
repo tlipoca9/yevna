@@ -2,10 +2,10 @@ package yevna_test
 
 import (
 	"context"
-	"fmt"
 	"os"
 
 	"github.com/go-viper/mapstructure/v2"
+	"github.com/goccy/go-json"
 
 	"github.com/tlipoca9/yevna"
 	"github.com/tlipoca9/yevna/parser"
@@ -44,9 +44,84 @@ drwxr-xr-x     - foobarbazq 21 Mar 17:29  parser
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(res)
+	buf, err := json.MarshalIndent(res, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+	_, _ = os.Stdout.Write(buf)
 	// Output:
-	// [map[Date Modified:21 Mar 16:44 Name:ca.txt Permissions:.rw-r--r--@ Size:139M User:foobarbazq] map[Date Modified:21 Mar 16:44 Name:cmd Permissions:drwxr-xr-x Size:- User:foobarbazq] map[Date Modified:21 Mar 09:42 Name:cmdx Permissions:drwxr-xr-x Size:- User:foobarbazq] map[Date Modified:21 Mar 17:34 Name:examples Permissions:drwxr-xr-x Size:- User:foobarbazq] map[Date Modified:21 Mar 17:36 Name:execx Permissions:drwxr-xr-x Size:- User:foobarbazq] map[Date Modified:21 Mar 17:29 Name:go.mod Permissions:.rw-r--r-- Size:1.2k User:foobarbazq] map[Date Modified:21 Mar 17:29 Name:go.sum Permissions:.rw-r--r-- Size:14k User:foobarbazq] map[Date Modified:21 Mar 15:51 Name:Makefile Permissions:.rw-r--r-- Size:220 User:foobarbazq] map[Date Modified:21 Mar 17:29 Name:parser Permissions:drwxr-xr-x Size:- User:foobarbazq] map[Date Modified:21 Mar 17:22 Name:yevna.go Permissions:.rw-r--r-- Size:4.8k User:foobarbazq]]
+	// [
+	//   {
+	//     "Date Modified": "21 Mar 16:44",
+	//     "Name": "ca.txt",
+	//     "Permissions": ".rw-r--r--@",
+	//     "Size": "139M",
+	//     "User": "foobarbazq"
+	//   },
+	//   {
+	//     "Date Modified": "21 Mar 16:44",
+	//     "Name": "cmd",
+	//     "Permissions": "drwxr-xr-x",
+	//     "Size": "-",
+	//     "User": "foobarbazq"
+	//   },
+	//   {
+	//     "Date Modified": "21 Mar 09:42",
+	//     "Name": "cmdx",
+	//     "Permissions": "drwxr-xr-x",
+	//     "Size": "-",
+	//     "User": "foobarbazq"
+	//   },
+	//   {
+	//     "Date Modified": "21 Mar 17:34",
+	//     "Name": "examples",
+	//     "Permissions": "drwxr-xr-x",
+	//     "Size": "-",
+	//     "User": "foobarbazq"
+	//   },
+	//   {
+	//     "Date Modified": "21 Mar 17:36",
+	//     "Name": "execx",
+	//     "Permissions": "drwxr-xr-x",
+	//     "Size": "-",
+	//     "User": "foobarbazq"
+	//   },
+	//   {
+	//     "Date Modified": "21 Mar 17:29",
+	//     "Name": "go.mod",
+	//     "Permissions": ".rw-r--r--",
+	//     "Size": "1.2k",
+	//     "User": "foobarbazq"
+	//   },
+	//   {
+	//     "Date Modified": "21 Mar 17:29",
+	//     "Name": "go.sum",
+	//     "Permissions": ".rw-r--r--",
+	//     "Size": "14k",
+	//     "User": "foobarbazq"
+	//   },
+	//   {
+	//     "Date Modified": "21 Mar 15:51",
+	//     "Name": "Makefile",
+	//     "Permissions": ".rw-r--r--",
+	//     "Size": "220",
+	//     "User": "foobarbazq"
+	//   },
+	//   {
+	//     "Date Modified": "21 Mar 17:29",
+	//     "Name": "parser",
+	//     "Permissions": "drwxr-xr-x",
+	//     "Size": "-",
+	//     "User": "foobarbazq"
+	//   },
+	//   {
+	//     "Date Modified": "21 Mar 17:22",
+	//     "Name": "yevna.go",
+	//     "Permissions": ".rw-r--r--",
+	//     "Size": "4.8k",
+	//     "User": "foobarbazq"
+	//   }
+	// ]
 }
 
 func ExampleCmd_Pipe() {
@@ -74,9 +149,49 @@ drwxr-xr-x     - foobarbazq 21 Mar 17:29  parser
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(res)
+	buf, err := json.MarshalIndent(res, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+	_, _ = os.Stdout.Write(buf)
 	// Output:
-	// [map[Date Modified:21 Mar 16:44 Name:ca.txt Permissions:.rw-r--r--@ Size:139M User:foobarbazq] map[Date Modified:21 Mar 17:29 Name:go.mod Permissions:.rw-r--r-- Size:1.2k User:foobarbazq] map[Date Modified:21 Mar 17:29 Name:go.sum Permissions:.rw-r--r-- Size:14k User:foobarbazq] map[Date Modified:21 Mar 15:51 Name:Makefile Permissions:.rw-r--r-- Size:220 User:foobarbazq] map[Date Modified:21 Mar 17:22 Name:yevna.go Permissions:.rw-r--r-- Size:4.8k User:foobarbazq]]
+	// [
+	//   {
+	//     "Date Modified": "21 Mar 16:44",
+	//     "Name": "ca.txt",
+	//     "Permissions": ".rw-r--r--@",
+	//     "Size": "139M",
+	//     "User": "foobarbazq"
+	//   },
+	//   {
+	//     "Date Modified": "21 Mar 17:29",
+	//     "Name": "go.mod",
+	//     "Permissions": ".rw-r--r--",
+	//     "Size": "1.2k",
+	//     "User": "foobarbazq"
+	//   },
+	//   {
+	//     "Date Modified": "21 Mar 17:29",
+	//     "Name": "go.sum",
+	//     "Permissions": ".rw-r--r--",
+	//     "Size": "14k",
+	//     "User": "foobarbazq"
+	//   },
+	//   {
+	//     "Date Modified": "21 Mar 15:51",
+	//     "Name": "Makefile",
+	//     "Permissions": ".rw-r--r--",
+	//     "Size": "220",
+	//     "User": "foobarbazq"
+	//   },
+	//   {
+	//     "Date Modified": "21 Mar 17:22",
+	//     "Name": "yevna.go",
+	//     "Permissions": ".rw-r--r--",
+	//     "Size": "4.8k",
+	//     "User": "foobarbazq"
+	//   }
+	// ]
 }
 
 func ExampleCmd_WriteFile() {
