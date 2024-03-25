@@ -103,6 +103,9 @@ func (c *Cmd) Quiet() *Cmd {
 	if c.Err != nil {
 		return c
 	}
+	if c.prevProcess != nil {
+		c.prevProcess.Quiet()
+	}
 
 	c.Options.Quiet()
 	return c
@@ -151,12 +154,12 @@ func (c *Cmd) WithStderr(w io.Writer) *Cmd {
 	return c
 }
 
-func (c *Cmd) Run() *Cmd {
+func (c *Cmd) Run() error {
 	if c.Err != nil {
-		return c
+		return c.Err
 	}
 
-	return c.start().wait()
+	return c.start().wait().Err
 }
 
 func (c *Cmd) RunWithParser(p parser.Parser, dc *mapstructure.DecoderConfig) error {
@@ -205,7 +208,7 @@ func (c *Cmd) RunWithParseFunc(p func(r io.Reader) (any, error), dc *mapstructur
 	return c.RunWithParser(parser.ParseFunc(p), dc)
 }
 
-func (c *Cmd) WriteToFile(path string) error {
+func (c *Cmd) WriteFile(path string) error {
 	if c.Err != nil {
 		return c.Err
 	}
@@ -214,6 +217,10 @@ func (c *Cmd) WriteToFile(path string) error {
 	if err != nil {
 		c.Err = err
 		return c.Err
+	}
+	err = os.MkdirAll(filepath.Dir(path), os.FileMode(0755))
+	if err != nil {
+		c.Err = err
 	}
 
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(0644))
@@ -231,7 +238,7 @@ func (c *Cmd) WriteToFile(path string) error {
 	return c.start().wait().Err
 }
 
-func (c *Cmd) AppendToFile(path string) error {
+func (c *Cmd) AppendFile(path string) error {
 	if c.Err != nil {
 		return c.Err
 	}
@@ -240,6 +247,10 @@ func (c *Cmd) AppendToFile(path string) error {
 	if err != nil {
 		c.Err = err
 		return c.Err
+	}
+	err = os.MkdirAll(filepath.Dir(path), os.FileMode(0755))
+	if err != nil {
+		c.Err = err
 	}
 
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.FileMode(0644))
