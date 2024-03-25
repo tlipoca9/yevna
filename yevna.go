@@ -16,20 +16,25 @@ import (
 	"github.com/tlipoca9/yevna/parser"
 )
 
+// GlobalOptions is the global options for the command
+// It is used to set the default options for the command
 var GlobalOptions Options
 
+// Options is the options for the command
 type Options struct {
 	quiet  func() bool
 	print  func(a ...any)
 	cmdStr func(cmd *exec.Cmd) string
 }
 
+// Quiet sets the quiet mode
 func (o *Options) Quiet() {
 	o.quiet = func() bool {
 		return true
 	}
 }
 
+// Verbose sets the verbose mode
 func (o *Options) Verbose() {
 	o.quiet = func() bool {
 		return false
@@ -63,14 +68,20 @@ func init() {
 	}
 }
 
+// Cmd enhances the exec.Cmd with more features
 type Cmd struct {
-	cmd         *exec.Cmd
+	// cmd is the exec.Cmd will be executed
+	cmd *exec.Cmd
+	// prevProcess is the previous process in the pipeline
+	// if it is nil, it means it is the first process of the pipeline
 	prevProcess *Cmd
-
+	// Err is the error of the command
 	Err error
+	// Options is the options for the command
 	Options
 }
 
+// Command returns a new Cmd with the global options
 func Command(ctx context.Context, name string, args ...string) *Cmd {
 	if len(name) == 0 {
 		return &Cmd{Err: ErrNameRequired}
@@ -86,6 +97,8 @@ func Command(ctx context.Context, name string, args ...string) *Cmd {
 	}
 }
 
+// Pipe returns a new Cmd with the pipeline
+// The first command is the first element of the cmds
 func Pipe(ctx context.Context, cmds ...[]string) *Cmd {
 	if len(cmds) == 0 {
 		return &Cmd{Err: errors.New("at least one command is required")}
@@ -99,6 +112,7 @@ func Pipe(ctx context.Context, cmds ...[]string) *Cmd {
 	return c
 }
 
+// Quiet sets the quiet mode
 func (c *Cmd) Quiet() *Cmd {
 	if c.Err != nil {
 		return c
@@ -111,6 +125,7 @@ func (c *Cmd) Quiet() *Cmd {
 	return c
 }
 
+// printCmd prints the command before executing it
 func (c *Cmd) printCmd() {
 	if c.Err != nil {
 		return
@@ -122,6 +137,7 @@ func (c *Cmd) printCmd() {
 	c.Options.print(c.Options.cmdStr(c.cmd))
 }
 
+// WithStdin sets the stdin for the command
 func (c *Cmd) WithStdin(r io.Reader) *Cmd {
 	if c.Err != nil {
 		return c
@@ -136,6 +152,7 @@ func (c *Cmd) WithStdin(r io.Reader) *Cmd {
 	return c
 }
 
+// WithStdout sets the stdout for the command
 func (c *Cmd) WithStdout(w io.Writer) *Cmd {
 	if c.Err != nil {
 		return c
@@ -145,6 +162,7 @@ func (c *Cmd) WithStdout(w io.Writer) *Cmd {
 	return c
 }
 
+// WithStderr sets the stderr for the command
 func (c *Cmd) WithStderr(w io.Writer) *Cmd {
 	if c.Err != nil {
 		return c
@@ -154,6 +172,8 @@ func (c *Cmd) WithStderr(w io.Writer) *Cmd {
 	return c
 }
 
+// Run runs the command
+// It will start all the processes in the pipeline
 func (c *Cmd) Run() error {
 	if c.Err != nil {
 		return c.Err
@@ -162,6 +182,9 @@ func (c *Cmd) Run() error {
 	return c.start().wait().Err
 }
 
+// RunWithParser runs the command with the parser
+// It parses the stdout of the command with the parser
+// and decodes the data with the decoder
 func (c *Cmd) RunWithParser(p parser.Parser, dc *mapstructure.DecoderConfig) error {
 	if c.Err != nil {
 		return c.Err
@@ -200,6 +223,7 @@ func (c *Cmd) RunWithParser(p parser.Parser, dc *mapstructure.DecoderConfig) err
 	return c.wait().Err
 }
 
+// RunWithParseFunc is shorthand for RunWithParser with the parse function
 func (c *Cmd) RunWithParseFunc(p func(r io.Reader) (any, error), dc *mapstructure.DecoderConfig) error {
 	if c.Err != nil {
 		return c.Err
@@ -208,6 +232,7 @@ func (c *Cmd) RunWithParseFunc(p func(r io.Reader) (any, error), dc *mapstructur
 	return c.RunWithParser(parser.ParseFunc(p), dc)
 }
 
+// WriteFile runs the command and writes the stdout to the file
 func (c *Cmd) WriteFile(path string) error {
 	if c.Err != nil {
 		return c.Err
@@ -238,6 +263,7 @@ func (c *Cmd) WriteFile(path string) error {
 	return c.start().wait().Err
 }
 
+// AppendFile runs the command and appends the stdout to the file
 func (c *Cmd) AppendFile(path string) error {
 	if c.Err != nil {
 		return c.Err
@@ -267,6 +293,8 @@ func (c *Cmd) AppendFile(path string) error {
 	return c.start().wait().Err
 }
 
+// start starts the command
+// It will start all the processes in the pipeline
 func (c *Cmd) start() *Cmd {
 	if c.Err != nil {
 		return c
@@ -308,6 +336,8 @@ func (c *Cmd) start() *Cmd {
 	return c
 }
 
+// wait waits for the command
+// It will wait for all the processes in the pipeline
 func (c *Cmd) wait() *Cmd {
 	if c.Err != nil {
 		return c
@@ -337,6 +367,7 @@ func (c *Cmd) wait() *Cmd {
 	return c
 }
 
+// Pipe returns a new Cmd with the pipeline
 func (c *Cmd) Pipe(ctx context.Context, name string, args ...string) *Cmd {
 	if c.Err != nil {
 		return c
