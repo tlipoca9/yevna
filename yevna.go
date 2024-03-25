@@ -3,8 +3,10 @@ package yevna
 import (
 	"bytes"
 	"context"
+	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/cockroachdb/errors"
@@ -63,22 +65,17 @@ func init() {
 
 type Cmd struct {
 	cmd         *exec.Cmd
-	pipeProcess *Cmd
+	prevProcess *Cmd
 
 	Err error
 	Options
-	parser        parser.Parser
-	decoderConfig *mapstructure.DecoderConfig
 }
 
 func Command(ctx context.Context, name string, args ...string) *Cmd {
 	if len(name) == 0 {
-		return &Cmd{Err: errors.New("name is required, but got empty string")}
+		return &Cmd{Err: ErrNameRequired}
 	}
 	cmd := exec.CommandContext(ctx, name, args...)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
 	return &Cmd{
 		cmd: cmd,
 		Options: Options{
@@ -122,21 +119,35 @@ func (c *Cmd) printCmd() {
 	c.Options.print(c.Options.cmdStr(c.cmd))
 }
 
-func (c *Cmd) WithParser(p parser.Parser) *Cmd {
+func (c *Cmd) WithStdin(r io.Reader) *Cmd {
 	if c.Err != nil {
 		return c
 	}
 
-	c.parser = p
+	if c.prevProcess != nil {
+		c.Err = errors.New("stdin is not allowed in pipeline")
+		return c
+	}
+
+	c.cmd.Stdin = r
 	return c
 }
 
-func (c *Cmd) WithDecoderConfig(dc mapstructure.DecoderConfig) *Cmd {
+func (c *Cmd) WithStdout(w io.Writer) *Cmd {
 	if c.Err != nil {
 		return c
 	}
 
-	c.decoderConfig = &dc
+	c.cmd.Stdout = w
+	return c
+}
+
+func (c *Cmd) WithStderr(w io.Writer) *Cmd {
+	if c.Err != nil {
+		return c
+	}
+
+	c.cmd.Stderr = w
 	return c
 }
 
@@ -145,52 +156,123 @@ func (c *Cmd) Run() *Cmd {
 		return c
 	}
 
-	if c.parser != nil {
-		if c.decoderConfig == nil {
-			c.Err = errors.New("DecodeConfig is required when Parser is set")
-			return c
-		}
-		c.cmd.Stdout = nil
-		rd, err := c.cmd.StdoutPipe()
-		if err != nil {
-			c.Err = err
-			return c
-		}
-		defer rd.Close()
-		if c.start().Err != nil {
-			return c
-		}
-		data, err := c.parser.Parse(rd)
-		if err != nil {
-			c.Err = err
-			return c
-		}
-		dec, err := mapstructure.NewDecoder(c.decoderConfig)
-		if err != nil {
-			c.Err = err
-			return c
-		}
+	return c.start().wait()
+}
 
-		err = dec.Decode(data)
-		if err != nil {
-			c.Err = err
-			return c
-		}
-
-		return c.wait()
+func (c *Cmd) RunWithParser(p parser.Parser, dc *mapstructure.DecoderConfig) error {
+	if c.Err != nil {
+		return c.Err
 	}
 
-	return c.start().wait()
+	if c.cmd.Stdout != nil {
+		c.Err = ErrStdoutAlreadySet
+		return c.Err
+	}
+	rd, err := c.cmd.StdoutPipe()
+	if err != nil {
+		c.Err = err
+		return c.Err
+	}
+	defer rd.Close()
+	if c.start().Err != nil {
+		return c.Err
+	}
+	data, err := p.Parse(rd)
+	if err != nil {
+		c.Err = err
+		return c.Err
+	}
+	dec, err := mapstructure.NewDecoder(dc)
+	if err != nil {
+		c.Err = err
+		return c.Err
+	}
+
+	err = dec.Decode(data)
+	if err != nil {
+		c.Err = err
+		return c.Err
+	}
+
+	return c.wait().Err
+}
+
+func (c *Cmd) RunWithParseFunc(p func(r io.Reader) (any, error), dc *mapstructure.DecoderConfig) error {
+	if c.Err != nil {
+		return c.Err
+	}
+
+	return c.RunWithParser(parser.ParseFunc(p), dc)
+}
+
+func (c *Cmd) WriteToFile(path string) error {
+	if c.Err != nil {
+		return c.Err
+	}
+
+	path, err := filepath.Abs(path)
+	if err != nil {
+		c.Err = err
+		return c.Err
+	}
+
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(0644))
+	if err != nil {
+		c.Err = err
+		return c.Err
+	}
+	defer f.Close()
+
+	if c.cmd.Stdout != nil {
+		c.Err = ErrStdoutAlreadySet
+		return c.Err
+	}
+	c.cmd.Stdout = f
+	return c.start().wait().Err
+}
+
+func (c *Cmd) AppendToFile(path string) error {
+	if c.Err != nil {
+		return c.Err
+	}
+
+	path, err := filepath.Abs(path)
+	if err != nil {
+		c.Err = err
+		return c.Err
+	}
+
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.FileMode(0644))
+	if err != nil {
+		c.Err = err
+		return c.Err
+	}
+
+	if c.cmd.Stdout != nil {
+		c.Err = ErrStdoutAlreadySet
+		return c.Err
+	}
+	c.cmd.Stdout = f
+	return c.start().wait().Err
 }
 
 func (c *Cmd) start() *Cmd {
 	if c.Err != nil {
 		return c
 	}
+	if c.cmd.Stdin == nil {
+		c.cmd.Stdin = os.Stdin
+	}
+	if c.cmd.Stdout == nil {
+		c.cmd.Stdout = os.Stdout
+	}
+	if c.cmd.Stderr == nil {
+		c.cmd.Stderr = os.Stderr
+	}
 
 	// start all the processes in the pipeline
 	var processes []*Cmd
-	for i := c.pipeProcess; i != nil; i = i.pipeProcess {
+	for i := c.prevProcess; i != nil; i = i.prevProcess {
 		processes = append(processes, i)
 	}
 
@@ -222,7 +304,7 @@ func (c *Cmd) wait() *Cmd {
 
 	// wait for all the processes in the pipeline
 	var processes []*Cmd
-	for i := c.pipeProcess; i != nil; i = i.pipeProcess {
+	for i := c.prevProcess; i != nil; i = i.prevProcess {
 		processes = append(processes, i)
 	}
 	var err error
@@ -249,13 +331,14 @@ func (c *Cmd) Pipe(ctx context.Context, name string, args ...string) *Cmd {
 		return c
 	}
 
-	if c.parser != nil {
-		return &Cmd{Err: errors.New("cannot pipe after setting a parser")}
-	}
 	if len(name) == 0 {
-		return &Cmd{Err: errors.New("name is required, but got empty string")}
+		return &Cmd{Err: ErrNameRequired}
 	}
 
+	if c.cmd.Stdout != nil {
+		c.Err = ErrStdoutAlreadySet
+		return c
+	}
 	c.cmd.Stdout = nil
 
 	prevStdout, err := c.cmd.StdoutPipe()
@@ -265,7 +348,7 @@ func (c *Cmd) Pipe(ctx context.Context, name string, args ...string) *Cmd {
 	}
 
 	nextC := Command(ctx, name, args...)
-	nextC.pipeProcess = c
+	nextC.prevProcess = c
 	nextC.cmd.Stdin = prevStdout
 	return nextC
 }

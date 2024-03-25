@@ -26,10 +26,9 @@ drwxr-xr-x     - foobarbazq 21 Mar 17:36  execx
 drwxr-xr-x     - foobarbazq 21 Mar 17:29  parser
 .rw-r--r--  4.8k foobarbazq 21 Mar 17:22  yevna.go`[1:]).
 		Quiet().
-		WithParser(parser.Table()).
-		WithDecoderConfig(mapstructure.DecoderConfig{Result: &res}).
-		Run().Err
+		RunWithParser(parser.Table(), &mapstructure.DecoderConfig{Result: &res})
 	if err != nil {
+		fmt.Printf("error: %+v\n", err)
 		panic(err)
 	}
 	fmt.Println(res)
