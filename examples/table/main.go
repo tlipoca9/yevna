@@ -3,12 +3,24 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+
 	"github.com/go-viper/mapstructure/v2"
+
 	"github.com/tlipoca9/yevna"
 	"github.com/tlipoca9/yevna/parser"
 )
 
 func main() {
+	defer func() {
+		if r := recover(); r != nil {
+			if err, ok := r.(error); ok {
+				fmt.Printf("panic: %+v\n", err)
+				os.Exit(1)
+			}
+			panic(r)
+		}
+	}()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -28,7 +40,6 @@ drwxr-xr-x     - foobarbazq 21 Mar 17:29  parser
 		Quiet().
 		RunWithParser(parser.Table(), &mapstructure.DecoderConfig{Result: &res})
 	if err != nil {
-		fmt.Printf("error: %+v\n", err)
 		panic(err)
 	}
 	fmt.Println(res)
