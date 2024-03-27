@@ -157,6 +157,10 @@ func (c *Cmd) WithStdout(w io.Writer) *Cmd {
 	if c.Err != nil {
 		return c
 	}
+	if c.cmd.Stdout != nil && c.cmd.Stdout != os.Stdout {
+		c.Err = ErrStdoutAlreadySet
+		return c
+	}
 
 	c.cmd.Stdout = w
 	return c
@@ -167,8 +171,24 @@ func (c *Cmd) WithStderr(w io.Writer) *Cmd {
 	if c.Err != nil {
 		return c
 	}
+	if c.prevProcess != nil {
+		c.prevProcess.WithStderr(w)
+	}
 
 	c.cmd.Stderr = w
+	return c
+}
+
+// WithWorkDir sets the working directory for the command
+func (c *Cmd) WithWorkDir(dir string) *Cmd {
+	if c.Err != nil {
+		return c
+	}
+	if c.prevProcess != nil {
+		c.prevProcess.WithWorkDir(dir)
+	}
+
+	c.cmd.Dir = dir
 	return c
 }
 
