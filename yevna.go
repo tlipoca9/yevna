@@ -26,10 +26,10 @@ type Options struct {
 	Quiet    bool
 	Print    func(w io.Writer, a ...any)
 	Colorful bool
-	// Secret is the function to replace the secret
+	// SecretFunc is the function to replace the secret
 	// It is used to replace the secret with the placeholder
 	// If the secret is not found, it should return false
-	Secret func(arg string) (placeholder string, ok bool)
+	SecretFunc func(arg string) (placeholder string, ok bool)
 }
 
 func init() {
@@ -39,7 +39,7 @@ func init() {
 		p.Print(a...)
 	}
 	GlobalOptions.Colorful = true
-	GlobalOptions.Secret = func(_ string) (string, bool) { return "", false }
+	GlobalOptions.SecretFunc = func(_ string) (string, bool) { return "", false }
 }
 
 // Cmd enhances the exec.Cmd with more features
@@ -64,10 +64,10 @@ func Command(ctx context.Context, name string, args ...string) *Cmd {
 	return &Cmd{
 		cmd: cmd,
 		Options: Options{
-			Quiet:    GlobalOptions.Quiet,
-			Print:    GlobalOptions.Print,
-			Colorful: GlobalOptions.Colorful,
-			Secret:   GlobalOptions.Secret,
+			Quiet:      GlobalOptions.Quiet,
+			Print:      GlobalOptions.Print,
+			Colorful:   GlobalOptions.Colorful,
+			SecretFunc: GlobalOptions.SecretFunc,
 		},
 	}
 }
@@ -152,16 +152,16 @@ func (c *Cmd) Monochrome() *Cmd {
 	return c
 }
 
-// Secret sets the secret function
-func (c *Cmd) Secret(f func(string) (string, bool)) *Cmd {
+// WithSecretFunc sets the secret function
+func (c *Cmd) WithSecretFunc(f func(string) (string, bool)) *Cmd {
 	if c.Err != nil {
 		return c
 	}
 	if c.prevProcess != nil {
-		c.prevProcess.Secret(f)
+		c.prevProcess.WithSecretFunc(f)
 	}
 
-	c.Options.Secret = f
+	c.Options.SecretFunc = f
 	return c
 }
 
@@ -480,7 +480,7 @@ func (c *Cmd) String() string {
 	}
 	for _, v := range options {
 		buf.WriteString(" ")
-		if vv, ok := c.Options.Secret(v); ok {
+		if vv, ok := c.Options.SecretFunc(v); ok {
 			buf.WriteString(vv)
 			continue
 		}
