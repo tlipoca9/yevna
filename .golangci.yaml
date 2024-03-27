@@ -52,6 +52,8 @@ linters-settings:
         disabled: false
         arguments:
          - "bytes.Buffer.WriteString"
+         - "bytes.Buffer.WriteByte"
+         - "bytes.Buffer.Write"
          - "fmt.Printf"
          - "fmt.Println"
       - name: dot-imports

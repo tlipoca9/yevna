@@ -3,6 +3,7 @@ package yevna
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -22,9 +23,9 @@ var GlobalOptions Options
 
 // Options is the options for the command
 type Options struct {
-	quiet  func() bool
-	print  func(a ...any)
-	cmdStr func(cmd *exec.Cmd) string
+	quiet    func() bool
+	print    func(a ...any)
+	colorful func() bool
 }
 
 // Quiet sets the quiet mode
@@ -41,31 +42,27 @@ func (o *Options) Verbose() {
 	}
 }
 
+// Colorful sets the colorful mode
+func (o *Options) Colorful() {
+	o.colorful = func() bool {
+		return true
+	}
+}
+
+// DisableColorful disables the colorful mode
+func (o *Options) DisableColorful() {
+	o.colorful = func() bool {
+		return false
+	}
+}
+
 func init() {
 	basicTxt := pterm.BasicTextPrinter{
 		Writer: os.Stderr,
 	}
 	GlobalOptions.Verbose()
 	GlobalOptions.print = func(a ...any) { basicTxt.Print(a...) }
-	GlobalOptions.cmdStr = func(cmd *exec.Cmd) string {
-		var buf bytes.Buffer
-		name := cmd.Args[0]
-		options := cmd.Args[1:]
-		buf.WriteString("$ ")
-		buf.WriteString(pterm.FgLightMagenta.Sprint(name))
-		for _, v := range options {
-			buf.WriteString(" ")
-			if v == "--" {
-				buf.WriteString(pterm.FgLightCyan.Sprint(v))
-			} else if strings.HasPrefix(v, "-") && !strings.HasPrefix(v, "---") {
-				buf.WriteString(pterm.FgLightYellow.Sprint(v))
-			} else {
-				buf.WriteString(v)
-			}
-		}
-		buf.WriteString("\n")
-		return buf.String()
-	}
+	GlobalOptions.Colorful()
 }
 
 // Cmd enhances the exec.Cmd with more features
@@ -90,9 +87,9 @@ func Command(ctx context.Context, name string, args ...string) *Cmd {
 	return &Cmd{
 		cmd: cmd,
 		Options: Options{
-			quiet:  GlobalOptions.quiet,
-			print:  GlobalOptions.print,
-			cmdStr: GlobalOptions.cmdStr,
+			quiet:    GlobalOptions.quiet,
+			print:    GlobalOptions.print,
+			colorful: GlobalOptions.colorful,
 		},
 	}
 }
@@ -125,6 +122,19 @@ func (c *Cmd) Quiet() *Cmd {
 	return c
 }
 
+// Colorful sets the colorful mode
+func (c *Cmd) Colorful() *Cmd {
+	if c.Err != nil {
+		return c
+	}
+	if c.prevProcess != nil {
+		c.prevProcess.Colorful()
+	}
+
+	c.Options.Colorful()
+	return c
+}
+
 // printCmd prints the command before executing it
 func (c *Cmd) printCmd() {
 	if c.Err != nil {
@@ -134,7 +144,20 @@ func (c *Cmd) printCmd() {
 	if c.Options.quiet() {
 		return
 	}
-	c.Options.print(c.Options.cmdStr(c.cmd))
+
+	var buf bytes.Buffer
+	processes := make([]*Cmd, 0)
+	for i := c.prevProcess; i != nil; i = i.prevProcess {
+		processes = append(processes, i)
+	}
+	buf.WriteString("$ ")
+	for i := len(processes) - 1; i >= 0; i-- {
+		buf.WriteString(processes[i].String())
+		buf.WriteString(" | ")
+	}
+	buf.WriteString(c.String())
+	buf.WriteByte('\n')
+	c.Options.print(buf.String())
 }
 
 // WithStdin sets the stdin for the command
@@ -408,9 +431,45 @@ func (c *Cmd) Pipe(ctx context.Context, name string, args ...string) *Cmd {
 		c.Err = err
 		return c
 	}
+	c.Quiet()
 
 	nextC := Command(ctx, name, args...)
 	nextC.prevProcess = c
 	nextC.cmd.Stdin = prevStdout
 	return nextC
+}
+
+func (c *Cmd) String() string {
+	var buf bytes.Buffer
+	name := c.cmd.Args[0]
+	options := c.cmd.Args[1:]
+	if c.colorful() {
+		buf.WriteString(pterm.FgLightMagenta.Sprint(name))
+	} else {
+		buf.WriteString(name)
+	}
+	for _, v := range options {
+		buf.WriteString(" ")
+		if strings.Contains(v, "\n") {
+			if strings.Contains(v, `"`) && strings.Contains(v, "'") {
+				v = fmt.Sprintf(`$'%s'`, v)
+			} else if strings.Contains(v, `"`) {
+				v = fmt.Sprintf(`'%s'`, v)
+			} else {
+				v = fmt.Sprintf(`"%s"`, v)
+			}
+		}
+		if c.colorful() {
+			if v == "--" {
+				buf.WriteString(pterm.FgLightCyan.Sprint(v))
+			} else if strings.HasPrefix(v, "-") && !strings.HasPrefix(v, "---") {
+				buf.WriteString(pterm.FgLightYellow.Sprint(v))
+			} else {
+				buf.WriteString(v)
+			}
+		} else {
+			buf.WriteString(v)
+		}
+	}
+	return buf.String()
 }
