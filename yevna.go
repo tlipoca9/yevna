@@ -23,46 +23,23 @@ var GlobalOptions Options
 
 // Options is the options for the command
 type Options struct {
-	quiet    func() bool
-	print    func(a ...any)
-	colorful func() bool
-}
-
-// Quiet sets the quiet mode
-func (o *Options) Quiet() {
-	o.quiet = func() bool {
-		return true
-	}
-}
-
-// Verbose sets the verbose mode
-func (o *Options) Verbose() {
-	o.quiet = func() bool {
-		return false
-	}
-}
-
-// Colorful sets the colorful mode
-func (o *Options) Colorful() {
-	o.colorful = func() bool {
-		return true
-	}
-}
-
-// DisableColorful disables the colorful mode
-func (o *Options) DisableColorful() {
-	o.colorful = func() bool {
-		return false
-	}
+	Quiet    bool
+	Print    func(w io.Writer, a ...any)
+	Colorful bool
+	// Secret is the function to replace the secret
+	// It is used to replace the secret with the placeholder
+	// If the secret is not found, it should return false
+	Secret func(arg string) (placeholder string, ok bool)
 }
 
 func init() {
-	basicTxt := pterm.BasicTextPrinter{
-		Writer: os.Stderr,
+	GlobalOptions.Quiet = false
+	GlobalOptions.Print = func(w io.Writer, a ...any) {
+		p := pterm.BasicTextPrinter{Writer: w}
+		p.Print(a...)
 	}
-	GlobalOptions.Verbose()
-	GlobalOptions.print = func(a ...any) { basicTxt.Print(a...) }
-	GlobalOptions.Colorful()
+	GlobalOptions.Colorful = true
+	GlobalOptions.Secret = func(_ string) (string, bool) { return "", false }
 }
 
 // Cmd enhances the exec.Cmd with more features
@@ -87,9 +64,10 @@ func Command(ctx context.Context, name string, args ...string) *Cmd {
 	return &Cmd{
 		cmd: cmd,
 		Options: Options{
-			quiet:    GlobalOptions.quiet,
-			print:    GlobalOptions.print,
-			colorful: GlobalOptions.colorful,
+			Quiet:    GlobalOptions.Quiet,
+			Print:    GlobalOptions.Print,
+			Colorful: GlobalOptions.Colorful,
+			Secret:   GlobalOptions.Secret,
 		},
 	}
 }
@@ -118,7 +96,33 @@ func (c *Cmd) Quiet() *Cmd {
 		c.prevProcess.Quiet()
 	}
 
-	c.Options.Quiet()
+	c.Options.Quiet = true
+	return c
+}
+
+// Verbose sets the verbose mode
+func (c *Cmd) Verbose() *Cmd {
+	if c.Err != nil {
+		return c
+	}
+	if c.prevProcess != nil {
+		c.prevProcess.Verbose()
+	}
+
+	c.Options.Quiet = false
+	return c
+}
+
+// PrintFunc sets the print function
+func (c *Cmd) PrintFunc(f func(w io.Writer, a ...any)) *Cmd {
+	if c.Err != nil {
+		return c
+	}
+	if c.prevProcess != nil {
+		c.prevProcess.PrintFunc(f)
+	}
+
+	c.Options.Print = f
 	return c
 }
 
@@ -131,7 +135,33 @@ func (c *Cmd) Colorful() *Cmd {
 		c.prevProcess.Colorful()
 	}
 
-	c.Options.Colorful()
+	c.Options.Colorful = true
+	return c
+}
+
+// Monochrome sets the monochrome mode
+func (c *Cmd) Monochrome() *Cmd {
+	if c.Err != nil {
+		return c
+	}
+	if c.prevProcess != nil {
+		c.prevProcess.Monochrome()
+	}
+
+	c.Options.Colorful = false
+	return c
+}
+
+// Secret sets the secret function
+func (c *Cmd) Secret(f func(string) (string, bool)) *Cmd {
+	if c.Err != nil {
+		return c
+	}
+	if c.prevProcess != nil {
+		c.prevProcess.Secret(f)
+	}
+
+	c.Options.Secret = f
 	return c
 }
 
@@ -141,7 +171,7 @@ func (c *Cmd) printCmd() {
 		return
 	}
 
-	if c.Options.quiet() {
+	if c.Options.Quiet {
 		return
 	}
 
@@ -157,7 +187,7 @@ func (c *Cmd) printCmd() {
 	}
 	buf.WriteString(c.String())
 	buf.WriteByte('\n')
-	c.Options.print(buf.String())
+	c.Options.Print(c.cmd.Stderr, buf.String())
 }
 
 // WithStdin sets the stdin for the command
@@ -443,13 +473,17 @@ func (c *Cmd) String() string {
 	var buf bytes.Buffer
 	name := c.cmd.Args[0]
 	options := c.cmd.Args[1:]
-	if c.colorful() {
+	if c.Options.Colorful {
 		buf.WriteString(pterm.FgLightMagenta.Sprint(name))
 	} else {
 		buf.WriteString(name)
 	}
 	for _, v := range options {
 		buf.WriteString(" ")
+		if vv, ok := c.Options.Secret(v); ok {
+			buf.WriteString(vv)
+			continue
+		}
 		if strings.Contains(v, "\n") {
 			if strings.Contains(v, `"`) && strings.Contains(v, "'") {
 				v = fmt.Sprintf(`$'%s'`, v)
@@ -459,7 +493,7 @@ func (c *Cmd) String() string {
 				v = fmt.Sprintf(`"%s"`, v)
 			}
 		}
-		if c.colorful() {
+		if c.Options.Colorful {
 			if v == "--" {
 				buf.WriteString(pterm.FgLightCyan.Sprint(v))
 			} else if strings.HasPrefix(v, "-") && !strings.HasPrefix(v, "---") {

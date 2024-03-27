@@ -3,6 +3,7 @@ package yevna_test
 import (
 	"context"
 	"os"
+	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/goccy/go-json"
@@ -243,4 +244,21 @@ func ExampleCmd_AppendFile() {
 	// Output:
 	// Hello,
 	// World!
+}
+
+func ExampleCmd_Secret() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	err := yevna.Command(ctx, "echo", "This is contains secret").
+		WithStderr(os.Stdout).Monochrome().
+		Secret(func(s string) (string, bool) {
+			return strings.ReplaceAll(s, "secret", "<mask>"), strings.Contains(s, "secret")
+		}).Run()
+	if err != nil {
+		panic(err)
+	}
+	// Output:
+	// $ echo This is contains <mask>
+	// This is contains secret
 }
