@@ -264,3 +264,19 @@ func ExampleCmd_WithSecretFunc() {
 	// $ echo This is contains <mask>
 	// This is contains secret
 }
+
+func ExampleCmd_Silent() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	err := yevna.Command(ctx, "echo", "Hello, World!").
+		WithPrintWriter(os.Stdout).
+		Monochrome().
+		Silent().
+		Run()
+	if err != nil {
+		panic(err)
+	}
+	// Output:
+	// $ echo Hello, World!
+}

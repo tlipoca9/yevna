@@ -138,6 +138,25 @@ func (c *Cmd) Monochrome() *Cmd {
 	return c
 }
 
+// Silent sets the silent mode
+func (c *Cmd) Silent() *Cmd {
+	if c.Err != nil {
+		return c
+	}
+
+	processes := make([]*Cmd, 0)
+	for i := c.prevProcess; i != nil; i = i.prevProcess {
+		processes = append(processes, i)
+	}
+
+	for i := len(processes) - 1; i >= 0; i-- {
+		processes[i].cmd.Stderr = io.Discard
+	}
+
+	c.cmd.Stdout = io.Discard
+	return c
+}
+
 // WithSecretFunc sets the secret function
 func (c *Cmd) WithSecretFunc(f func(string) (string, bool)) *Cmd {
 	if c.Err != nil {
