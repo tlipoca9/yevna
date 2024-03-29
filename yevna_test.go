@@ -2,6 +2,7 @@ package yevna_test
 
 import (
 	"context"
+	"io"
 	"os"
 	"strings"
 
@@ -40,7 +41,7 @@ drwxr-xr-x     - foobarbazq 21 Mar 17:36  execx
 .rw-r--r--   220 foobarbazq 21 Mar 15:51  Makefile
 drwxr-xr-x     - foobarbazq 21 Mar 17:29  parser
 .rw-r--r--  4.8k foobarbazq 21 Mar 17:22  yevna.go`[1:]).
-		Quiet().
+		WithPrintWriter(io.Discard).
 		RunWithParser(parser.Table(), &mapstructure.DecoderConfig{Result: &res})
 	if err != nil {
 		panic(err)
@@ -145,7 +146,7 @@ drwxr-xr-x     - foobarbazq 21 Mar 17:29  parser
 .rw-r--r--  4.8k foobarbazq 21 Mar 17:22  yevna.go`[1:]},
 		[]string{"grep", "-v", "drwx"},
 	).
-		Quiet().
+		WithPrintWriter(io.Discard).
 		RunWithParser(parser.Table(), &mapstructure.DecoderConfig{Result: &res})
 	if err != nil {
 		panic(err)
@@ -251,7 +252,8 @@ func ExampleCmd_WithSecretFunc() {
 	defer cancel()
 
 	err := yevna.Command(ctx, "echo", "This is contains secret").
-		WithStderr(os.Stdout).Monochrome().
+		WithPrintWriter(os.Stdout).
+		Monochrome().
 		WithSecretFunc(func(s string) (string, bool) {
 			return strings.ReplaceAll(s, "secret", "<mask>"), strings.Contains(s, "secret")
 		}).Run()

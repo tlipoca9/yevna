@@ -23,9 +23,9 @@ var GlobalOptions Options
 
 // Options is the options for the command
 type Options struct {
-	Quiet    bool
-	Print    func(w io.Writer, a ...any)
-	Colorful bool
+	PrintWriter io.Writer
+	Print       func(w io.Writer, a ...any)
+	Colorful    bool
 	// SecretFunc is the function to replace the secret
 	// It is used to replace the secret with the placeholder
 	// If the secret is not found, it should return false
@@ -33,7 +33,7 @@ type Options struct {
 }
 
 func init() {
-	GlobalOptions.Quiet = false
+	GlobalOptions.PrintWriter = os.Stderr
 	GlobalOptions.Print = func(w io.Writer, a ...any) {
 		p := pterm.BasicTextPrinter{Writer: w}
 		p.Print(a...)
@@ -64,10 +64,10 @@ func Command(ctx context.Context, name string, args ...string) *Cmd {
 	return &Cmd{
 		cmd: cmd,
 		Options: Options{
-			Quiet:      GlobalOptions.Quiet,
-			Print:      GlobalOptions.Print,
-			Colorful:   GlobalOptions.Colorful,
-			SecretFunc: GlobalOptions.SecretFunc,
+			PrintWriter: GlobalOptions.PrintWriter,
+			Print:       GlobalOptions.Print,
+			Colorful:    GlobalOptions.Colorful,
+			SecretFunc:  GlobalOptions.SecretFunc,
 		},
 	}
 }
@@ -87,39 +87,25 @@ func Pipe(ctx context.Context, cmds ...[]string) *Cmd {
 	return c
 }
 
-// Quiet sets the quiet mode
-func (c *Cmd) Quiet() *Cmd {
+func (c *Cmd) WithPrintWriter(w io.Writer) *Cmd {
 	if c.Err != nil {
 		return c
 	}
 	if c.prevProcess != nil {
-		c.prevProcess.Quiet()
+		c.prevProcess.WithPrintWriter(w)
 	}
 
-	c.Options.Quiet = true
+	c.Options.PrintWriter = w
 	return c
 }
 
-// Verbose sets the verbose mode
-func (c *Cmd) Verbose() *Cmd {
+// WithPrintFunc sets the print function
+func (c *Cmd) WithPrintFunc(f func(w io.Writer, a ...any)) *Cmd {
 	if c.Err != nil {
 		return c
 	}
 	if c.prevProcess != nil {
-		c.prevProcess.Verbose()
-	}
-
-	c.Options.Quiet = false
-	return c
-}
-
-// PrintFunc sets the print function
-func (c *Cmd) PrintFunc(f func(w io.Writer, a ...any)) *Cmd {
-	if c.Err != nil {
-		return c
-	}
-	if c.prevProcess != nil {
-		c.prevProcess.PrintFunc(f)
+		c.prevProcess.WithPrintFunc(f)
 	}
 
 	c.Options.Print = f
@@ -170,8 +156,9 @@ func (c *Cmd) printCmd() {
 	if c.Err != nil {
 		return
 	}
-
-	if c.Options.Quiet {
+	if c.Options.PrintWriter == nil ||
+		c.Options.PrintWriter == io.Discard ||
+		c.Options.Print == nil {
 		return
 	}
 
@@ -187,7 +174,7 @@ func (c *Cmd) printCmd() {
 	}
 	buf.WriteString(c.String())
 	buf.WriteByte('\n')
-	c.Options.Print(c.cmd.Stderr, buf.String())
+	c.Options.Print(c.PrintWriter, buf.String())
 }
 
 // WithStdin sets the stdin for the command
@@ -461,7 +448,7 @@ func (c *Cmd) Pipe(ctx context.Context, name string, args ...string) *Cmd {
 		c.Err = err
 		return c
 	}
-	c.Quiet()
+	c.PrintWriter = nil
 
 	nextC := Command(ctx, name, args...)
 	nextC.prevProcess = c
