@@ -2,13 +2,14 @@ package yevna_test
 
 import (
 	"context"
+	"os"
+
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/goccy/go-json"
-	"github.com/tlipoca9/yevna/tracer"
-	"os"
 
 	"github.com/tlipoca9/yevna"
 	"github.com/tlipoca9/yevna/parser"
+	"github.com/tlipoca9/yevna/tracer"
 )
 
 func ExampleCommand() {

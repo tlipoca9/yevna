@@ -3,15 +3,18 @@ package yevna_test
 import (
 	"bytes"
 	"context"
-	"github.com/go-viper/mapstructure/v2"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	"github.com/tlipoca9/yevna"
-	"github.com/tlipoca9/yevna/parser"
-	"github.com/tlipoca9/yevna/tracer"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/go-viper/mapstructure/v2"
+
+	"github.com/tlipoca9/yevna"
+	"github.com/tlipoca9/yevna/parser"
+	"github.com/tlipoca9/yevna/tracer"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Cmd", func() {
@@ -129,5 +132,4 @@ everyone
 `[1:]))
 		})
 	})
-
 })

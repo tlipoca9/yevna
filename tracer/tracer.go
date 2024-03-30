@@ -3,9 +3,10 @@ package tracer
 import (
 	"bytes"
 	"fmt"
-	"github.com/pterm/pterm"
 	"io"
 	"strings"
+
+	"github.com/pterm/pterm"
 )
 
 type Tracer interface {

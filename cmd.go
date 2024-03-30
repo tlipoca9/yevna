@@ -2,15 +2,17 @@ package yevna
 
 import (
 	"bytes"
-	"github.com/cockroachdb/errors"
-	"github.com/go-viper/mapstructure/v2"
-	"github.com/tlipoca9/yevna/parser"
-	"github.com/tlipoca9/yevna/tracer"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/cockroachdb/errors"
+	"github.com/go-viper/mapstructure/v2"
+
+	"github.com/tlipoca9/yevna/parser"
+	"github.com/tlipoca9/yevna/tracer"
 )
 
 // Cmd enhances the exec.Cmd with more features

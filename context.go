@@ -2,10 +2,12 @@ package yevna
 
 import (
 	"context"
-	"github.com/cockroachdb/errors"
-	"github.com/tlipoca9/yevna/tracer"
 	"os"
 	"os/exec"
+
+	"github.com/cockroachdb/errors"
+
+	"github.com/tlipoca9/yevna/tracer"
 )
 
 type Context struct {
