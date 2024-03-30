@@ -2,26 +2,96 @@ package yevna_test
 
 import (
 	"context"
-	"io"
-	"os"
-	"strings"
-
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/goccy/go-json"
+	"github.com/tlipoca9/yevna/tracer"
+	"os"
 
 	"github.com/tlipoca9/yevna"
 	"github.com/tlipoca9/yevna/parser"
 )
 
-func ExampleCmd_Run() {
+func ExampleCommand() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	err := yevna.Command(ctx, "echo", "Hello World").Run()
+	err := yevna.Command(ctx, "echo", "Hello World").
+		WithExecTrace(false).
+		Run()
 	if err != nil {
 		panic(err)
 	}
 	// Output: Hello World
+}
+
+func ExamplePipe() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var res []map[string]any
+	err := yevna.Pipe(ctx,
+		[]string{"echo", `
+Permissions Size User       Date Modified Name
+.rw-r--r--@ 139M foobarbazq 21 Mar 16:44  ca.txt
+drwxr-xr-x     - foobarbazq 21 Mar 16:44  cmd
+drwxr-xr-x     - foobarbazq 21 Mar 09:42  cmdx
+drwxr-xr-x     - foobarbazq 21 Mar 17:34  examples
+drwxr-xr-x     - foobarbazq 21 Mar 17:36  execx
+.rw-r--r--  1.2k foobarbazq 21 Mar 17:29  go.mod
+.rw-r--r--   14k foobarbazq 21 Mar 17:29  go.sum
+.rw-r--r--   220 foobarbazq 21 Mar 15:51  Makefile
+drwxr-xr-x     - foobarbazq 21 Mar 17:29  parser
+.rw-r--r--  4.8k foobarbazq 21 Mar 17:22  yevna.go`[1:]},
+		[]string{"grep", "-v", "drwx"},
+	).
+		WithExecTrace(false).
+		RunWithParser(parser.Table(), &mapstructure.DecoderConfig{Result: &res})
+	if err != nil {
+		panic(err)
+	}
+	buf, err := json.MarshalIndent(res, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+	_, _ = os.Stdout.Write(buf)
+	// Output:
+	// [
+	//   {
+	//     "Date Modified": "21 Mar 16:44",
+	//     "Name": "ca.txt",
+	//     "Permissions": ".rw-r--r--@",
+	//     "Size": "139M",
+	//     "User": "foobarbazq"
+	//   },
+	//   {
+	//     "Date Modified": "21 Mar 17:29",
+	//     "Name": "go.mod",
+	//     "Permissions": ".rw-r--r--",
+	//     "Size": "1.2k",
+	//     "User": "foobarbazq"
+	//   },
+	//   {
+	//     "Date Modified": "21 Mar 17:29",
+	//     "Name": "go.sum",
+	//     "Permissions": ".rw-r--r--",
+	//     "Size": "14k",
+	//     "User": "foobarbazq"
+	//   },
+	//   {
+	//     "Date Modified": "21 Mar 15:51",
+	//     "Name": "Makefile",
+	//     "Permissions": ".rw-r--r--",
+	//     "Size": "220",
+	//     "User": "foobarbazq"
+	//   },
+	//   {
+	//     "Date Modified": "21 Mar 17:22",
+	//     "Name": "yevna.go",
+	//     "Permissions": ".rw-r--r--",
+	//     "Size": "4.8k",
+	//     "User": "foobarbazq"
+	//   }
+	// ]
 }
 
 func ExampleCmd_RunWithParser() {
@@ -41,7 +111,7 @@ drwxr-xr-x     - foobarbazq 21 Mar 17:36  execx
 .rw-r--r--   220 foobarbazq 21 Mar 15:51  Makefile
 drwxr-xr-x     - foobarbazq 21 Mar 17:29  parser
 .rw-r--r--  4.8k foobarbazq 21 Mar 17:22  yevna.go`[1:]).
-		WithPrintWriter(io.Discard).
+		WithExecTrace(false).
 		RunWithParser(parser.Table(), &mapstructure.DecoderConfig{Result: &res})
 	if err != nil {
 		panic(err)
@@ -126,76 +196,6 @@ drwxr-xr-x     - foobarbazq 21 Mar 17:29  parser
 	// ]
 }
 
-func ExampleCmd_Pipe() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	var res []map[string]any
-	err := yevna.Pipe(ctx,
-		[]string{"echo", `
-Permissions Size User       Date Modified Name
-.rw-r--r--@ 139M foobarbazq 21 Mar 16:44  ca.txt
-drwxr-xr-x     - foobarbazq 21 Mar 16:44  cmd
-drwxr-xr-x     - foobarbazq 21 Mar 09:42  cmdx
-drwxr-xr-x     - foobarbazq 21 Mar 17:34  examples
-drwxr-xr-x     - foobarbazq 21 Mar 17:36  execx
-.rw-r--r--  1.2k foobarbazq 21 Mar 17:29  go.mod
-.rw-r--r--   14k foobarbazq 21 Mar 17:29  go.sum
-.rw-r--r--   220 foobarbazq 21 Mar 15:51  Makefile
-drwxr-xr-x     - foobarbazq 21 Mar 17:29  parser
-.rw-r--r--  4.8k foobarbazq 21 Mar 17:22  yevna.go`[1:]},
-		[]string{"grep", "-v", "drwx"},
-	).
-		WithPrintWriter(io.Discard).
-		RunWithParser(parser.Table(), &mapstructure.DecoderConfig{Result: &res})
-	if err != nil {
-		panic(err)
-	}
-	buf, err := json.MarshalIndent(res, "", "  ")
-	if err != nil {
-		panic(err)
-	}
-	_, _ = os.Stdout.Write(buf)
-	// Output:
-	// [
-	//   {
-	//     "Date Modified": "21 Mar 16:44",
-	//     "Name": "ca.txt",
-	//     "Permissions": ".rw-r--r--@",
-	//     "Size": "139M",
-	//     "User": "foobarbazq"
-	//   },
-	//   {
-	//     "Date Modified": "21 Mar 17:29",
-	//     "Name": "go.mod",
-	//     "Permissions": ".rw-r--r--",
-	//     "Size": "1.2k",
-	//     "User": "foobarbazq"
-	//   },
-	//   {
-	//     "Date Modified": "21 Mar 17:29",
-	//     "Name": "go.sum",
-	//     "Permissions": ".rw-r--r--",
-	//     "Size": "14k",
-	//     "User": "foobarbazq"
-	//   },
-	//   {
-	//     "Date Modified": "21 Mar 15:51",
-	//     "Name": "Makefile",
-	//     "Permissions": ".rw-r--r--",
-	//     "Size": "220",
-	//     "User": "foobarbazq"
-	//   },
-	//   {
-	//     "Date Modified": "21 Mar 17:22",
-	//     "Name": "yevna.go",
-	//     "Permissions": ".rw-r--r--",
-	//     "Size": "4.8k",
-	//     "User": "foobarbazq"
-	//   }
-	// ]
-}
-
 func ExampleCmd_WriteFile() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -203,6 +203,7 @@ func ExampleCmd_WriteFile() {
 	path := "tmp/hello.txt"
 
 	err := yevna.Command(ctx, "echo", "Hello, World!").
+		WithExecTrace(false).
 		WriteFile(path)
 	if err != nil {
 		panic(err)
@@ -225,12 +226,14 @@ func ExampleCmd_AppendFile() {
 	path := "tmp/hello.txt"
 
 	err := yevna.Command(ctx, "echo", "Hello,").
+		WithExecTrace(false).
 		WriteFile(path)
 	if err != nil {
 		panic(err)
 	}
 
 	err = yevna.Command(ctx, "echo", "World!").
+		WithExecTrace(false).
 		AppendFile(path)
 	if err != nil {
 		panic(err)
@@ -247,16 +250,17 @@ func ExampleCmd_AppendFile() {
 	// World!
 }
 
-func ExampleCmd_WithSecretFunc() {
+func ExampleCmd_WithExecTracer() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	err := yevna.Command(ctx, "echo", "This is contains secret").
-		WithPrintWriter(os.Stdout).
-		Monochrome().
-		WithSecretFunc(func(s string) (string, bool) {
-			return strings.ReplaceAll(s, "secret", "<mask>"), strings.Contains(s, "secret")
-		}).Run()
+		WithExecTracer(tracer.NewExecTracer(
+			os.Stdout,
+			tracer.WithSecret("secret", "<mask>"),
+			tracer.WithColor(false),
+		)).
+		Run()
 	if err != nil {
 		panic(err)
 	}
@@ -270,8 +274,7 @@ func ExampleCmd_Silent() {
 	defer cancel()
 
 	err := yevna.Command(ctx, "echo", "Hello, World!").
-		WithPrintWriter(os.Stdout).
-		Monochrome().
+		WithExecTracer(tracer.NewExecTracer(os.Stdout, tracer.WithColor(false))).
 		Silent().
 		Run()
 	if err != nil {
