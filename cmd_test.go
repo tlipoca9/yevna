@@ -24,15 +24,12 @@ var _ = Describe("Cmd", func() {
 	)
 	BeforeEach(func() {
 		buf = &bytes.Buffer{}
-		y = yevna.NewContext(
-			context.Background(),
-			yevna.WithExecTracer(tracer.NewExecTracer(buf, tracer.WithColor(false))),
-		)
+		y = yevna.NewContext(yevna.WithExecTracer(tracer.NewExecTracer(buf, tracer.WithColor(false))))
 	})
 
 	Context("Silent", func() {
 		It("should set the silent mode", func() {
-			err := y.Command("echo", "hello").Silent().Run()
+			err := y.Command(context.Background(), "echo", "hello").Silent().Run()
 			Expect(err).To(BeNil())
 			Expect(buf.String()).To(Equal("$ echo hello\n"))
 		})
@@ -40,7 +37,7 @@ var _ = Describe("Cmd", func() {
 
 	Context("WithStdin", func() {
 		It("should set the stdin for the command", func() {
-			err := y.Command("cat").WithStdin(strings.NewReader("hello")).WithStdout(buf).Run()
+			err := y.Command(context.Background(), "cat").WithStdin(strings.NewReader("hello")).WithStdout(buf).Run()
 			Expect(err).To(BeNil())
 			Expect(buf.String()).To(Equal(`
 $ cat
@@ -50,7 +47,7 @@ hello`[1:]))
 
 	Context("WithStdout", func() {
 		It("should set the stdout for the command", func() {
-			err := y.Command("echo", "hello").WithStdout(buf).Run()
+			err := y.Command(context.Background(), "echo", "hello").WithStdout(buf).Run()
 			Expect(err).To(BeNil())
 			Expect(buf.String()).To(Equal(`
 $ echo hello
@@ -63,7 +60,7 @@ hello
 		It("should set the working directory for the command", func() {
 			wd, err := os.Getwd()
 			Expect(err).To(BeNil())
-			err = y.Command("pwd").WithWorkDir(filepath.Join(wd, "parser")).WithStdout(buf).Run()
+			err = y.Command(context.Background(), "pwd").WithWorkDir(filepath.Join(wd, "parser")).WithStdout(buf).Run()
 			Expect(err).To(BeNil())
 			Expect(buf.String()).To(Equal("$ pwd\n" + filepath.Join(wd, "parser") + "\n"))
 		})
@@ -71,7 +68,7 @@ hello
 
 	Context("WithExecTrace", func() {
 		It("should disable exec trace for the command", func() {
-			err := y.Command("echo", "hello").WithExecTrace(false).WithStdout(buf).Run()
+			err := y.Command(context.Background(), "echo", "hello").WithExecTracer(tracer.Discard).WithStdout(buf).Run()
 			Expect(err).To(BeNil())
 			Expect(buf.String()).To(Equal("hello\n"))
 		})
@@ -79,7 +76,7 @@ hello
 
 	Context("WithExecTracer", func() {
 		It("should set the exec tracer for the command", func() {
-			err := y.Command("echo", "hello").
+			err := y.Command(context.Background(), "echo", "hello").
 				WithExecTracer(tracer.NewExecTracer(
 					buf,
 					tracer.WithColor(false),
@@ -94,7 +91,7 @@ hello
 
 	Context("Run", func() {
 		It("should run the command", func() {
-			err := y.Command("echo", "hello").WithStdout(buf).Run()
+			err := y.Command(context.Background(), "echo", "hello").WithStdout(buf).Run()
 			Expect(err).To(BeNil())
 			Expect(buf.String()).To(Equal(`
 $ echo hello
@@ -106,7 +103,7 @@ hello
 	Context("RunWithParser", func() {
 		It("should run the command with the parser", func() {
 			var res map[string]string
-			err := y.Command("echo", `{"foo": "bar"}`).
+			err := y.Command(context.Background(), "echo", `{"foo": "bar"}`).
 				RunWithParser(parser.JSON(), &mapstructure.DecoderConfig{Result: &res})
 			Expect(err).To(BeNil())
 			Expect(buf.String()).To(Equal(`
@@ -118,7 +115,7 @@ $ echo {"foo": "bar"}
 
 	Context("Pipe", func() {
 		It("should pipe the commands", func() {
-			err := y.Command("echo", "hello,world,everyone").
+			err := y.Command(context.Background(), "echo", "hello,world,everyone").
 				Pipe("xargs", "-d", ",", "-I", "{}", "echo", "{}").
 				WithStdout(buf).
 				Run()

@@ -2,35 +2,38 @@ package yevna
 
 import (
 	"context"
+	"log/slog"
 	"os"
 	"os/exec"
+	"sync/atomic"
 
 	"github.com/cockroachdb/errors"
 
 	"github.com/tlipoca9/yevna/tracer"
 )
 
-type Context struct {
-	ctx    context.Context
-	cancel func()
+var defaultCtx atomic.Pointer[Context]
 
+func Default() *Context {
+	return defaultCtx.Load()
+}
+
+func SetDefault(c *Context) {
+	defaultCtx.Store(c)
+}
+
+type Context struct {
 	workDir string
 
-	enableExecTrace bool
-	execTracer      tracer.Tracer
+	execTracer tracer.Tracer
 }
 
 type ContextOption func(*Context)
 
 func WithWorkDir(workDir string) ContextOption {
+	slog.Default()
 	return func(c *Context) {
 		c.workDir = workDir
-	}
-}
-
-func WithExecTrace(enable bool) ContextOption {
-	return func(c *Context) {
-		c.enableExecTrace = enable
 	}
 }
 
@@ -40,13 +43,9 @@ func WithExecTracer(t tracer.Tracer) ContextOption {
 	}
 }
 
-func NewContext(ctx context.Context, opts ...ContextOption) *Context {
-	cCtx, cancel := context.WithCancel(ctx)
+func NewContext(opts ...ContextOption) *Context {
 	c := &Context{
-		ctx:             cCtx,
-		cancel:          cancel,
-		enableExecTrace: true,
-		execTracer:      tracer.NewExecTracer(os.Stderr),
+		execTracer: tracer.NewExecTracer(os.Stderr),
 	}
 
 	for _, opt := range opts {
@@ -56,19 +55,20 @@ func NewContext(ctx context.Context, opts ...ContextOption) *Context {
 	return c
 }
 
-func (c *Context) Command(name string, args ...string) *Cmd {
-	cmd := exec.CommandContext(c.ctx, name, args...)
+func (c *Context) Command(ctx context.Context, name string, args ...string) *Cmd {
+	cmd := exec.CommandContext(ctx, name, args...)
 
 	// copy a new context
 	cc := *c
 
 	return &Cmd{
+		ctx:     ctx,
 		Context: &cc,
 		cmd:     cmd,
 	}
 }
 
-func (c *Context) Pipe(commands ...[]string) *Cmd {
+func (c *Context) Pipe(ctx context.Context, commands ...[]string) *Cmd {
 	if len(commands) == 0 {
 		panic(errors.New("no command provided"))
 	}
@@ -77,7 +77,7 @@ func (c *Context) Pipe(commands ...[]string) *Cmd {
 			panic(errors.Newf("No.%d command is empty", i))
 		}
 	}
-	cmd := c.Command(commands[0][0], commands[0][1:]...)
+	cmd := c.Command(ctx, commands[0][0], commands[0][1:]...)
 	for i := 1; i < len(commands); i++ {
 		cmd = cmd.Pipe(commands[i][0], commands[i][1:]...)
 	}

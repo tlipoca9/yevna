@@ -2,6 +2,7 @@ package yevna
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"os"
 	"os/exec"
@@ -17,6 +18,7 @@ import (
 
 // Cmd enhances the exec.Cmd with more features
 type Cmd struct {
+	ctx context.Context
 	// Context is the context of the command
 	*Context
 	// cmd is the exec.Cmd will be executed
@@ -91,15 +93,6 @@ func (c *Cmd) WithWorkDir(dir string) *Cmd {
 		return c
 	}
 	c.Context.workDir = dir
-	return c
-}
-
-// WithExecTrace sets the exec trace for the command
-func (c *Cmd) WithExecTrace(enable bool) *Cmd {
-	if c.Err != nil {
-		return c
-	}
-	c.Context.enableExecTrace = enable
 	return c
 }
 
@@ -276,9 +269,7 @@ func (c *Cmd) Start() *Cmd {
 	if c.Context.workDir != "" {
 		c.cmd.Dir = c.Context.workDir
 	}
-	if c.Context.enableExecTrace {
-		c.Context.execTracer.Trace(c.String())
-	}
+	c.Context.execTracer.Trace(c.String())
 	c.Err = c.cmd.Start()
 	return c
 }
@@ -319,7 +310,7 @@ func (c *Cmd) Pipe(name string, args ...string) *Cmd {
 		return c
 	}
 
-	nextC := c.Context.Command(name, args...)
+	nextC := c.Context.Command(c.ctx, name, args...)
 	nextC.prevProcess = c
 	nextC.cmd.Stdin = stdoutPipe
 	return nextC

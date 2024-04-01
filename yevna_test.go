@@ -17,7 +17,7 @@ func ExampleCommand() {
 	defer cancel()
 
 	err := yevna.Command(ctx, "echo", "Hello World").
-		WithExecTrace(false).
+		WithExecTracer(tracer.Discard).
 		Run()
 	if err != nil {
 		panic(err)
@@ -45,7 +45,7 @@ drwxr-xr-x     - foobarbazq 21 Mar 17:29  parser
 .rw-r--r--  4.8k foobarbazq 21 Mar 17:22  yevna.go`[1:]},
 		[]string{"grep", "-v", "drwx"},
 	).
-		WithExecTrace(false).
+		WithExecTracer(tracer.Discard).
 		RunWithParser(parser.Table(), &mapstructure.DecoderConfig{Result: &res})
 	if err != nil {
 		panic(err)
@@ -112,7 +112,7 @@ drwxr-xr-x     - foobarbazq 21 Mar 17:36  execx
 .rw-r--r--   220 foobarbazq 21 Mar 15:51  Makefile
 drwxr-xr-x     - foobarbazq 21 Mar 17:29  parser
 .rw-r--r--  4.8k foobarbazq 21 Mar 17:22  yevna.go`[1:]).
-		WithExecTrace(false).
+		WithExecTracer(tracer.Discard).
 		RunWithParser(parser.Table(), &mapstructure.DecoderConfig{Result: &res})
 	if err != nil {
 		panic(err)
@@ -204,7 +204,7 @@ func ExampleCmd_WriteFile() {
 	path := "tmp/hello.txt"
 
 	err := yevna.Command(ctx, "echo", "Hello, World!").
-		WithExecTrace(false).
+		WithExecTracer(tracer.Discard).
 		WriteFile(path)
 	if err != nil {
 		panic(err)
@@ -227,14 +227,14 @@ func ExampleCmd_AppendFile() {
 	path := "tmp/hello.txt"
 
 	err := yevna.Command(ctx, "echo", "Hello,").
-		WithExecTrace(false).
+		WithExecTracer(tracer.Discard).
 		WriteFile(path)
 	if err != nil {
 		panic(err)
 	}
 
 	err = yevna.Command(ctx, "echo", "World!").
-		WithExecTrace(false).
+		WithExecTracer(tracer.Discard).
 		AppendFile(path)
 	if err != nil {
 		panic(err)
