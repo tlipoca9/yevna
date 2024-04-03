@@ -2,18 +2,23 @@ package yevna
 
 import (
 	"context"
+	"sync/atomic"
 )
 
-// Command returns a new Cmd with the global options
-func Command(ctx context.Context, name string, args ...string) *Cmd {
-	return Default().Command(ctx, name, args...)
+var defaultContext atomic.Pointer[Context]
+
+func Default() *Context {
+	return defaultContext.Load()
 }
 
-// Pipe returns a new Cmd with the pipeline
-func Pipe(ctx context.Context, commands ...[]string) *Cmd {
-	return Default().Pipe(ctx, commands...)
+func SetDefault(c *Context) {
+	defaultContext.Store(c)
 }
 
 func init() {
-	SetDefault(NewContext())
+	SetDefault(New())
+}
+
+func Run(ctx context.Context, handlers ...Handler) error {
+	return Default().Run(ctx, handlers...)
 }

@@ -1,20 +1,11 @@
 package parser
 
-import "io"
+type Func func(b []byte, v any) error
 
-type ParseFunc func(r io.Reader) (any, error)
-
-func (f ParseFunc) Parse(r io.Reader) (any, error) {
-	return f(r)
+func (f Func) Unmarshal(b []byte, v any) error {
+	return f(b, v)
 }
 
 type Parser interface {
-	Parse(r io.Reader) (any, error)
+	Unmarshal([]byte, any) error
 }
-
-type DataType int
-
-const (
-	Object DataType = iota + 1
-	Array
-)

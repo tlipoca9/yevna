@@ -2,137 +2,59 @@ package yevna
 
 import (
 	"bytes"
-	"context"
 	"fmt"
-	"github.com/cockroachdb/errors"
-	"github.com/tlipoca9/yevna/tracer"
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"sync/atomic"
+
+	"github.com/cockroachdb/errors"
+
+	"github.com/tlipoca9/yevna/parser"
+	"github.com/tlipoca9/yevna/tracer"
 )
-
-var defaultHandlerContext atomic.Pointer[HandlerContext]
-
-func DefaultHandlerContext() *HandlerContext {
-	return defaultHandlerContext.Load()
-}
-
-func SetDefaultHandlerContext(c *HandlerContext) {
-	defaultHandlerContext.Store(c)
-}
-
-func init() {
-	SetDefaultHandlerContext(NewHandlerContext())
-}
 
 // HandlersChain defines a Handler slice
 type HandlersChain []Handler
 
-type HandlerContext struct {
-	workdir string
-	silent  bool
-	tracer  tracer.Tracer
-
-	ctx context.Context
-
-	index    int
-	handlers HandlersChain
-}
-
-func (c *HandlerContext) Context() context.Context {
-	return c.ctx
-}
-
-func (c *HandlerContext) Workdir(wd ...string) string {
-	if len(wd) > 1 {
-		panic("too many arguments")
-	}
-	if len(wd) == 1 {
-		path := wd[0]
-		if filepath.IsLocal(wd[0]) {
-			path = filepath.Join(c.workdir, path)
-		}
-		c.workdir = path
-	}
-
-	return c.workdir
-}
-
-func (c *HandlerContext) Silent(s ...bool) bool {
-	if len(s) > 1 {
-		panic("too many arguments")
-	}
-	if len(s) == 1 {
-		c.silent = s[0]
-	}
-	return c.silent
-}
-
-func (c *HandlerContext) Tracer(t ...tracer.Tracer) tracer.Tracer {
-	if len(t) > 1 {
-		panic("too many arguments")
-	}
-	if len(t) == 1 {
-		c.tracer = t[0]
-	}
-	return c.tracer
-}
-
-func (c *HandlerContext) Next(in any) (any, error) {
-	c.index++
-	for c.index < len(c.handlers) {
-		out, err := c.handlers[c.index].Handle(c, in)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to handle %d", c.index)
-		}
-		c.index++
-		in = out
-	}
-	return in, nil
-}
-
-func (c *HandlerContext) copy() *HandlerContext {
-	cc := &HandlerContext{
-		silent:  c.silent,
-		tracer:  c.tracer,
-		workdir: c.workdir,
-		index:   -1,
-	}
-	return cc
-}
-
-func (c *HandlerContext) Run(ctx context.Context, handlers ...Handler) error {
-	cc := c.copy()
-	cc.ctx = ctx
-	cc.handlers = handlers
-	_, err := cc.Next(nil)
-	return err
-}
-
-func NewHandlerContext() *HandlerContext {
-	return &HandlerContext{
-		ctx:    context.Background(),
-		silent: false,
-		tracer: tracer.Discard,
-	}
-}
-
 type Handler interface {
-	Handle(c *HandlerContext, in any) (any, error)
+	Handle(c *Context, in any) (any, error)
 }
 
-type HandlerFunc func(c *HandlerContext, in any) (any, error)
+// HandlerFunc defines a function type that implements Handler
+type HandlerFunc func(c *Context, in any) (any, error)
 
-func (f HandlerFunc) Handle(c *HandlerContext, in any) (any, error) {
+func (f HandlerFunc) Handle(c *Context, in any) (any, error) {
 	return f(c, in)
 }
 
-func Run(ctx context.Context, handlers ...Handler) error {
-	return DefaultHandlerContext().Run(ctx, handlers...)
+// Cd returns a Handler that changes the working directory
+func Cd(path string) Handler {
+	name := "cd"
+	args := []string{path}
+	return HandlerFunc(func(c *Context, in any) (any, error) {
+		c.Tracer().Trace(name, args...)
+		c.Workdir(path)
+		return in, nil
+	})
 }
 
+// Silent returns a Handler that sets the silent flag
+func Silent(s bool) Handler {
+	return HandlerFunc(func(c *Context, in any) (any, error) {
+		c.Silent(s)
+		return in, nil
+	})
+}
+
+// Tracer returns a Handler that sets the tracer
+func Tracer(t tracer.Tracer) Handler {
+	return HandlerFunc(func(c *Context, in any) (any, error) {
+		c.Tracer(t)
+		return in, nil
+	})
+}
+
+// Echo returns a Handler that echoes the input
 func Echo(r io.Reader) Handler {
 	var (
 		name = "echo"
@@ -145,38 +67,15 @@ func Echo(r io.Reader) Handler {
 		args = append(args, fmt.Sprintf("<%T>", r))
 	}
 
-	return HandlerFunc(func(c *HandlerContext, in any) (any, error) {
+	return HandlerFunc(func(c *Context, _ any) (any, error) {
 		c.Tracer().Trace(name, args...)
 		return r, nil
 	})
 }
 
-func Cd(path string) Handler {
-	name := "cd"
-	args := []string{path}
-	return HandlerFunc(func(c *HandlerContext, in any) (any, error) {
-		c.Tracer().Trace(name, args...)
-		c.Workdir(path)
-		return in, nil
-	})
-}
-
-func Silent(s bool) Handler {
-	return HandlerFunc(func(c *HandlerContext, in any) (any, error) {
-		c.Silent(s)
-		return in, nil
-	})
-}
-
-func Tracer(t tracer.Tracer) Handler {
-	return HandlerFunc(func(c *HandlerContext, in any) (any, error) {
-		c.Tracer(t)
-		return in, nil
-	})
-}
-
+// Exec returns a Handler that executes a command
 func Exec(name string, args ...string) Handler {
-	return HandlerFunc(func(c *HandlerContext, in any) (any, error) {
+	return HandlerFunc(func(c *Context, in any) (any, error) {
 		var r io.Reader
 		if in != nil {
 			var ok bool
@@ -211,6 +110,7 @@ func Exec(name string, args ...string) Handler {
 	})
 }
 
+// Tee returns a Handler that writes to multiple writers
 func Tee(w ...io.Writer) Handler {
 	var (
 		name = "tee"
@@ -233,7 +133,7 @@ func Tee(w ...io.Writer) Handler {
 	if len(args) < len(w) {
 		args = append(args, fmt.Sprintf("<%d other writers>", len(w)-len(args)))
 	}
-	return HandlerFunc(func(c *HandlerContext, in any) (any, error) {
+	return HandlerFunc(func(c *Context, in any) (any, error) {
 		if in == nil {
 			return nil, errors.New("input is nil")
 		}
@@ -249,5 +149,47 @@ func Tee(w ...io.Writer) Handler {
 		w = append(w, &buf)
 		_, err := io.Copy(io.MultiWriter(w...), r)
 		return &buf, err
+	})
+}
+
+// Unmarshal returns a Handler that unmarshal the input
+func Unmarshal(p parser.Parser, v any) Handler {
+	var (
+		name = "unmarshal"
+		args = []string{fmt.Sprintf("%T", v)}
+	)
+	return HandlerFunc(func(c *Context, in any) (any, error) {
+		if in == nil {
+			return nil, errors.New("input is nil")
+		}
+		var b bytes.Buffer
+		switch r := in.(type) {
+		case io.Reader:
+			_, err := io.Copy(&b, r)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to copy")
+			}
+		case []byte:
+			_, err := b.Write(r)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to write")
+			}
+		case string:
+			_, err := b.WriteString(r)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to write")
+			}
+		default:
+			return nil, errors.New("input is not io.Reader, []byte or string")
+		}
+
+		c.Tracer().Trace(name, args...)
+
+		err := p.Unmarshal(b.Bytes(), v)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to unmarshal")
+		}
+
+		return v, nil
 	})
 }

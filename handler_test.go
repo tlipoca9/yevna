@@ -3,45 +3,50 @@ package yevna_test
 import (
 	"bytes"
 	"context"
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/tlipoca9/yevna"
+	"github.com/tlipoca9/yevna/parser"
 	"github.com/tlipoca9/yevna/tracer"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-var svc *httptest.Server
+var (
+	svc       *httptest.Server
+	ipInfoMap = map[string]any{
+		"ip":       "1.1.1.1",
+		"hostname": "one.one.one.one",
+		"anycast":  true,
+		"city":     "The Rocks",
+		"region":   "New South Wales",
+		"country":  "AU",
+		"loc":      "-33.8592,151.2081",
+		"org":      "AS13335 Cloudflare, Inc.",
+		"postal":   "2000",
+		"timezone": "Australia/Sydney",
+	}
+)
 
 var _ = BeforeSuite(func() {
 	gin.SetMode(gin.ReleaseMode)
 	g := gin.New()
 	g.GET("/ipinfo", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"ip":       "1.1.1.1",
-			"hostname": "one.one.one.one",
-			"anycast":  true,
-			"city":     "The Rocks",
-			"region":   "New South Wales",
-			"country":  "AU",
-			"loc":      "-33.8592,151.2081",
-			"org":      "AS13335 Cloudflare, Inc.",
-			"postal":   "2000",
-			"timezone": "Australia/Sydney",
-		})
+		c.JSON(http.StatusOK, ipInfoMap)
 	})
 	svc = httptest.NewServer(g)
 })
 
 var _ = Describe("Handler", func() {
 	var buf *bytes.Buffer
-	y := yevna.NewHandlerContext()
+	y := yevna.New()
 	y.Tracer(tracer.Discard)
 
 	BeforeEach(func() {
@@ -102,4 +107,19 @@ var _ = Describe("Handler", func() {
 		})
 	})
 
+	Context("unmarshal", func() {
+		When("input is json", func() {
+			It("should return expected object", func() {
+				var got map[string]any
+				err := y.Run(
+					context.Background(),
+					yevna.Silent(true),
+					yevna.Exec("curl", svc.URL+"/ipinfo"),
+					yevna.Unmarshal(parser.JSON(), &got),
+				)
+				Expect(err).To(BeNil())
+				Expect(got).To(Equal(ipInfoMap))
+			})
+		})
+	})
 })

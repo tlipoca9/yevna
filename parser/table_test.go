@@ -1,7 +1,6 @@
 package parser_test
 
 import (
-	"io"
 	"strings"
 	"time"
 
@@ -14,20 +13,27 @@ import (
 )
 
 var _ = Describe("TableParser", func() {
+	p := parser.Table()
+	var got []map[string]any
+
+	BeforeEach(func() {
+		got = nil
+	})
+
 	When("input is empty", func() {
 		It("return empty object", func() {
-			p := parser.Table()
-			got, err := p.Parse(strings.NewReader(""))
+			buf := []byte("")
+
+			err := p.Unmarshal(buf, &got)
 			Expect(err).To(BeNil())
 			Expect(got).To(BeEmpty())
-			Expect(len(got.([]map[string]any))).To(Equal(cap(got.([]map[string]any))))
+			Expect(len(got)).To(Equal(cap(got)))
 		})
 	})
 
 	When("input is eza -l --header", func() {
 		It("return expected object", func() {
-			p := parser.Table()
-			got, err := p.Parse(strings.NewReader(`
+			buf := []byte(`
 Permissions Size User Date Modified Name
 drwxr-xr-x     - foo  21 Mar 09:58  cmd
 drwxr-xr-x     - foo  21 Mar 09:42  cmdx
@@ -37,7 +43,9 @@ drwxr-xr-x     - foo  21 Mar 10:03  execx
 .rw-r--r--   342 foo  21 Mar 09:59  main.go
 .rw-r--r--   132 foo  21 Mar 09:42  Makefile
 drwxr-xr-x     - foo  21 Mar 10:50  parser
-`[1:]))
+`[1:])
+
+			err := p.Unmarshal(buf, &got)
 			Expect(err).To(BeNil())
 			Expect(got).To(Equal([]map[string]any{
 				{
@@ -97,14 +105,13 @@ drwxr-xr-x     - foo  21 Mar 10:50  parser
 					"Name":          "parser",
 				},
 			}))
-			Expect(len(got.([]map[string]any))).To(Equal(cap(got.([]map[string]any))))
+			Expect(len(got)).To(Equal(cap(got)))
 		})
 	})
 
 	When("input is kubectl get pods", func() {
 		It("return expected object", func() {
-			p := parser.Table()
-			got, err := p.Parse(strings.NewReader(`
+			buf := []byte(`
 NAME                                                              READY   STATUS                       RESTARTS            AGE
 foofoofoofoofoofoofoofoo-74bc6cbf96-wgxn8                         1/1     Running                      0                   2d13h
 foofoofoofoofoofoofoofoofoofoof-66b86b4ccf-7mnzd                  0/1     CrashLoopBackOff             495 (4m13s ago)     42h
@@ -115,7 +122,9 @@ foofoof-7c65b8458c-wmxc2                                          1/1     Runnin
 foofoofoofoofoofoo-6ff6f5c957-9rmtv                               1/1     Running                      0                   40h
 foofoofoofoofoofoofoofoofoofoof-28516525-sfb8g                    0/1     Completed                    0                   13m
 foofoofoofoofoofoofoofoofoofoof-28516530-sxr74                    0/1     Completed                    0                   8m9s
-`[1:]))
+`[1:])
+
+			err := p.Unmarshal(buf, &got)
 			Expect(err).To(BeNil())
 			Expect(got).To(Equal([]map[string]any{
 				{
@@ -182,12 +191,12 @@ foofoofoofoofoofoofoofoofoofoof-28516530-sxr74                    0/1     Comple
 					"AGE":      "8m9s",
 				},
 			}))
-			Expect(len(got.([]map[string]any))).To(Equal(cap(got.([]map[string]any))))
+			Expect(len(got)).To(Equal(cap(got)))
 		})
 	})
 })
 
-func generateTableBenchmarkInput(i int) io.Reader {
+func generateTableBenchmarkInput(i int) []byte {
 	input := "Permissions Size User Date Modified Name\n"
 	input += strings.Repeat(`
 drwxr-xr-x     - foo  21 Mar 09:42  cmdx
@@ -198,7 +207,7 @@ drwxr-xr-x     - foo  21 Mar 10:03  execx
 .rw-r--r--   132 foo  21 Mar 09:42  Makefile
 drwxr-xr-x     - foo  21 Mar 10:50  parser
 `[1:], i)
-	return strings.NewReader(input)
+	return []byte(input)
 }
 
 var _ = Describe("Benchmark TableParser", func() {
@@ -207,8 +216,9 @@ var _ = Describe("Benchmark TableParser", func() {
 		AddReportEntry(experiment.Name, experiment)
 		experiment.Sample(func(_ int) {
 			r, p := generateTableBenchmarkInput(1e2), parser.Table()
-			experiment.MeasureDuration("parse", func() {
-				_, err := p.Parse(r)
+			got := make([]map[string]any, 0)
+			experiment.MeasureDuration("unmarshal", func() {
+				err := p.Unmarshal(r, &got)
 				Expect(err).To(BeNil())
 			})
 		}, gmeasure.SamplingConfig{N: 1e3, Duration: time.Second})
@@ -219,8 +229,9 @@ var _ = Describe("Benchmark TableParser", func() {
 		AddReportEntry(experiment.Name, experiment)
 		experiment.Sample(func(_ int) {
 			r, p := generateTableBenchmarkInput(1e3), parser.Table()
-			experiment.MeasureDuration("parse", func() {
-				_, err := p.Parse(r)
+			got := make([]map[string]any, 0)
+			experiment.MeasureDuration("unmarshal", func() {
+				err := p.Unmarshal(r, &got)
 				Expect(err).To(BeNil())
 			})
 		}, gmeasure.SamplingConfig{N: 1e3, Duration: time.Second})
@@ -231,8 +242,9 @@ var _ = Describe("Benchmark TableParser", func() {
 		AddReportEntry(experiment.Name, experiment)
 		experiment.Sample(func(_ int) {
 			r, p := generateTableBenchmarkInput(1e4), parser.Table()
-			experiment.MeasureDuration("parse", func() {
-				_, err := p.Parse(r)
+			got := make([]map[string]any, 0)
+			experiment.MeasureDuration("unmarshal", func() {
+				err := p.Unmarshal(r, &got)
 				Expect(err).To(BeNil())
 			})
 		}, gmeasure.SamplingConfig{N: 1e3, Duration: time.Second})

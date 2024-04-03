@@ -2,20 +2,21 @@ package parser
 
 import (
 	"bufio"
-	"io"
+	"bytes"
 	"strings"
 	"unicode"
 
 	"github.com/cockroachdb/errors"
+	"github.com/go-viper/mapstructure/v2"
 )
 
 type TableHeader string
 
-func (h TableHeader) Index(isSeperator func(rune) bool, lines []string) ([][2]int, error) {
+func (h TableHeader) Index(isSeparator func(rune) bool, lines []string) ([][2]int, error) {
 	ret := make([][2]int, 0)
 	headersMap := make([]bool, len(h)+1)
 	for i, c := range h {
-		if !isSeperator(c) {
+		if !isSeparator(c) {
 			headersMap[i] = true
 		}
 	}
@@ -24,7 +25,7 @@ func (h TableHeader) Index(isSeperator func(rune) bool, lines []string) ([][2]in
 			headersMap = append(headersMap, make([]bool, len(line)+1-len(headersMap))...)
 		}
 		for i, c := range line {
-			if !isSeperator(c) {
+			if !isSeparator(c) {
 				headersMap[i] = true
 			}
 		}
@@ -46,108 +47,120 @@ func (h TableHeader) Index(isSeperator func(rune) bool, lines []string) ([][2]in
 	return ret, nil
 }
 
-type TableParserOptions struct {
-	SeperatorFunc    func(rune) bool
-	Filter           func(i int, line string) bool
-	KeyTransformFunc func(string) string
-	ValTransformFunc func(string) string
-	HeaderTxt        string
-}
-
 // TableParser is a builder for the TableParser
 type TableParser struct {
-	opt TableParserOptions
+	conf             *mapstructure.DecoderConfig
+	separatorFunc    func(rune) bool
+	filter           func(i int, line string) bool
+	keyTransformFunc func(string) string
+	valTransformFunc func(string) string
+	headerTxt        string
 }
 
-func (b *TableParser) WithSeperatorFunc(f func(rune) bool) *TableParser {
-	b.opt.SeperatorFunc = f
-	return b
+func (p *TableParser) WithSeparatorFunc(f func(rune) bool) *TableParser {
+	p.separatorFunc = f
+	return p
 }
 
-func (b *TableParser) WithFilter(f func(i int, line string) bool) *TableParser {
-	b.opt.Filter = f
-	return b
+func (p *TableParser) WithFilter(f func(i int, line string) bool) *TableParser {
+	p.filter = f
+	return p
 }
 
-func (b *TableParser) WithKeyTransformFunc(f func(string) string) *TableParser {
-	b.opt.KeyTransformFunc = f
-	return b
+func (p *TableParser) WithKeyTransformFunc(f func(string) string) *TableParser {
+	p.keyTransformFunc = f
+	return p
 }
 
-func (b *TableParser) WithValTransformFunc(f func(string) string) *TableParser {
-	b.opt.ValTransformFunc = f
-	return b
+func (p *TableParser) WithValTransformFunc(f func(string) string) *TableParser {
+	p.valTransformFunc = f
+	return p
 }
 
-func (b *TableParser) WithHeader(header string) *TableParser {
-	b.opt.HeaderTxt = header
-	return b
+func (p *TableParser) WithHeader(header string) *TableParser {
+	p.headerTxt = header
+	return p
 }
 
-func (b *TableParser) lazyInit() {
-	if b.opt.SeperatorFunc == nil {
-		b.opt.SeperatorFunc = unicode.IsSpace
+func (p *TableParser) lazyInit() {
+	if p.separatorFunc == nil {
+		p.separatorFunc = unicode.IsSpace
 	}
-	if b.opt.Filter == nil {
-		b.opt.Filter = func(_ int, _ string) bool { return true }
+	if p.filter == nil {
+		p.filter = func(_ int, _ string) bool { return true }
 	}
-	if b.opt.KeyTransformFunc == nil {
-		b.opt.KeyTransformFunc = func(s string) string { return strings.TrimFunc(s, b.opt.SeperatorFunc) }
+	if p.keyTransformFunc == nil {
+		p.keyTransformFunc = func(s string) string { return strings.TrimFunc(s, p.separatorFunc) }
 	}
-	if b.opt.ValTransformFunc == nil {
-		b.opt.ValTransformFunc = func(s string) string { return strings.TrimFunc(s, b.opt.SeperatorFunc) }
+	if p.valTransformFunc == nil {
+		p.valTransformFunc = func(s string) string { return strings.TrimFunc(s, p.separatorFunc) }
 	}
-}
-
-// Parse is a magic method that implements the Parser interface
-func (b *TableParser) Parse(r io.Reader) (any, error) {
-	b.lazyInit()
-
-	// get the maximum length of the line
-	scanner := bufio.NewScanner(r)
-	lines := make([]string, 0)
-	for i := 0; scanner.Scan(); i++ {
-		if b.opt.Filter(i, scanner.Text()) {
-			lines = append(lines, scanner.Text())
-		}
+	if p.conf == nil {
+		p.conf = &mapstructure.DecoderConfig{TagName: "json"}
 	}
-	if scanner.Err() != nil {
-		return nil, scanner.Err()
+	if p.conf.TagName == "" {
+		p.conf.TagName = "json"
 	}
-	if len(lines) == 0 {
-		return []map[string]any{}, nil
-	}
-
-	headerTxt := b.opt.HeaderTxt
-	if len(headerTxt) == 0 {
-		headerTxt, lines = lines[0], lines[1:]
-		if len(lines) == 0 {
-			return []map[string]any{}, nil
-		}
-	}
-	header := TableHeader(headerTxt)
-	headerIndex, err := header.Index(b.opt.SeperatorFunc, lines)
-	if err != nil {
-		return nil, err
-	}
-
-	// parse the table
-	ret := make([]map[string]any, 0, len(lines))
-	for _, line := range lines {
-		obj := make(map[string]any, len(headerIndex))
-		for _, h := range headerIndex {
-			k := b.opt.KeyTransformFunc(headerTxt[h[0]:min(h[1], len(headerTxt))])
-			v := b.opt.ValTransformFunc(line[h[0]:min(h[1], len(line))])
-			obj[k] = v
-		}
-		ret = append(ret, obj)
-	}
-
-	return ret, nil
 }
 
 // Table returns a new TableParser to parse a table
 // It parses a table from an io.Reader
 func Table() *TableParser {
 	return &TableParser{}
+}
+
+func (p *TableParser) Unmarshal(b []byte, obj any) error {
+	p.lazyInit()
+
+	p.conf.Result = obj
+	dec, err := mapstructure.NewDecoder(p.conf)
+	if err != nil {
+		return errors.Wrap(err, "failed to create decoder")
+	}
+
+	// get the maximum length of the line
+	scanner := bufio.NewScanner(bytes.NewReader(b))
+	lines := make([]string, 0)
+	for i := 0; scanner.Scan(); i++ {
+		if p.filter(i, scanner.Text()) {
+			lines = append(lines, scanner.Text())
+		}
+	}
+	if scanner.Err() != nil {
+		return errors.Wrap(scanner.Err(), "failed to scan")
+	}
+	if len(lines) == 0 {
+		return nil
+	}
+
+	headerTxt := p.headerTxt
+	if len(headerTxt) == 0 {
+		headerTxt, lines = lines[0], lines[1:]
+		if len(lines) == 0 {
+			return nil
+		}
+	}
+	header := TableHeader(headerTxt)
+	headerIndex, err := header.Index(p.separatorFunc, lines)
+	if err != nil {
+		return errors.Wrap(err, "failed to parse header")
+	}
+
+	// parse the table
+	ret := make([]map[string]any, 0, len(lines))
+	for _, line := range lines {
+		item := make(map[string]any, len(headerIndex))
+		for _, h := range headerIndex {
+			k := p.keyTransformFunc(headerTxt[h[0]:min(h[1], len(headerTxt))])
+			v := p.valTransformFunc(line[h[0]:min(h[1], len(line))])
+			item[k] = v
+		}
+		ret = append(ret, item)
+	}
+
+	err = dec.Decode(ret)
+	if err != nil {
+		return errors.Wrap(err, "failed to decode")
+	}
+	return nil
 }

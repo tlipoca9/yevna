@@ -1,8 +1,6 @@
 package parser_test
 
 import (
-	"strings"
-
 	"github.com/tlipoca9/yevna/parser"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -12,9 +10,17 @@ import (
 var _ = Describe("YAMLParser", func() {
 	Context("Object", func() {
 		p := parser.YAML()
+		var got map[string]any
+
+		BeforeEach(func() {
+			got = nil
+		})
+
 		When("input is empty", func() {
 			It("return empty object", func() {
-				got, err := p.Parse(strings.NewReader(""))
+				buf := []byte("")
+
+				err := p.Unmarshal(buf, &got)
 				Expect(err).To(BeNil())
 				Expect(got).To(BeEmpty())
 			})
@@ -22,7 +28,9 @@ var _ = Describe("YAMLParser", func() {
 
 		When("input is simple", func() {
 			It("return expected object", func() {
-				got, err := p.Parse(strings.NewReader("FOO: BAR\n"))
+				buf := []byte("FOO: BAR\n")
+
+				err := p.Unmarshal(buf, &got)
 				Expect(err).To(BeNil())
 				Expect(got).To(Equal(map[string]any{"FOO": "BAR"}))
 			})
@@ -30,7 +38,9 @@ var _ = Describe("YAMLParser", func() {
 
 		When("input is multiline", func() {
 			It("return expected object", func() {
-				got, err := p.Parse(strings.NewReader("FOO: BAR\nBAZ: QUX\n"))
+				buf := []byte("FOO: BAR\nBAZ: QUX\n")
+
+				err := p.Unmarshal(buf, &got)
 				Expect(err).To(BeNil())
 				Expect(got).To(Equal(map[string]any{"FOO": "BAR", "BAZ": "QUX"}))
 			})
@@ -38,10 +48,17 @@ var _ = Describe("YAMLParser", func() {
 	})
 
 	Context("Array", func() {
-		p := parser.YAML().WithDataType(parser.Array)
+		p := parser.YAML()
+		var got []any
+		BeforeEach(func() {
+			got = nil
+		})
+
 		When("input is empty", func() {
 			It("return empty object", func() {
-				got, err := p.Parse(strings.NewReader("[]"))
+				buf := []byte("[]")
+
+				err := p.Unmarshal(buf, &got)
 				Expect(err).To(BeNil())
 				Expect(got).To(BeEmpty())
 			})
@@ -49,7 +66,9 @@ var _ = Describe("YAMLParser", func() {
 
 		When("input is simple", func() {
 			It("return expected object", func() {
-				got, err := p.Parse(strings.NewReader("- FOO\n"))
+				buf := []byte("- FOO\n")
+
+				err := p.Unmarshal(buf, &got)
 				Expect(err).To(BeNil())
 				Expect(got).To(Equal([]any{"FOO"}))
 			})
@@ -57,7 +76,9 @@ var _ = Describe("YAMLParser", func() {
 
 		When("input is multiline", func() {
 			It("return expected object", func() {
-				got, err := p.Parse(strings.NewReader("- FOO\n- BAR\n"))
+				buf := []byte("- FOO\n- BAR\n")
+
+				err := p.Unmarshal(buf, &got)
 				Expect(err).To(BeNil())
 				Expect(got).To(Equal([]any{"FOO", "BAR"}))
 			})

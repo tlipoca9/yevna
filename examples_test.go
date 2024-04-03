@@ -2,8 +2,9 @@ package yevna_test
 
 import (
 	"context"
-	"github.com/tlipoca9/yevna"
 	"os"
+
+	"github.com/tlipoca9/yevna"
 )
 
 func ExampleRun() {
