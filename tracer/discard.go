@@ -6,4 +6,4 @@ var Discard Tracer = discard{}
 
 type discard struct{}
 
-func (discard) Trace(string) {}
+func (discard) Trace(string, ...string) {}

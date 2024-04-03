@@ -10,7 +10,7 @@ import (
 )
 
 type Tracer interface {
-	Trace(string)
+	Trace(name string, args ...string)
 }
 
 type ExecTracer struct {
@@ -51,54 +51,48 @@ func NewExecTracer(w io.Writer, opts ...ExecTracerOption) *ExecTracer {
 	return t
 }
 
-func (s *ExecTracer) Trace(cmd string) {
-	// cmd may contain multiple commands separated by "|"
-	commands := strings.Split(cmd, "|")
+func (s *ExecTracer) Trace(name string, args ...string) {
 	var buf bytes.Buffer
-	for i, command := range commands {
-		if i == 0 {
-			buf.WriteByte('$')
-		} else {
-			buf.WriteString(" |")
-		}
-		command = strings.TrimSpace(command)
-		tokens := strings.Split(command, " ")
-		for j, token := range tokens {
-			buf.WriteByte(' ')
-			token = strings.TrimSpace(token)
+	buf.WriteByte('$')
+	buf.WriteByte(' ')
+	if s.enableColor {
+		buf.WriteString(pterm.FgLightMagenta.Sprint(name))
+	} else {
+		buf.WriteString(name)
+	}
+	for _, arg := range args {
+		buf.WriteByte(' ')
+		arg = strings.TrimSpace(arg)
 
-			// check if token is a secret
-			if mask, ok := s.secrets[token]; ok {
-				if s.enableColor {
-					mask = pterm.FgLightRed.Sprint(mask)
-				}
-				buf.WriteString(mask)
-				continue
-			}
-
-			// check if token is a multiline string
-			if strings.Contains(token, "\n") {
-				if strings.Contains(token, `"`) && strings.Contains(token, `'`) {
-					token = fmt.Sprintf(`$'%s'`, token)
-				} else if strings.Contains(token, `"`) {
-					token = fmt.Sprintf(`'%s'`, token)
-				} else {
-					token = fmt.Sprintf(`"%s"`, token)
-				}
-			}
-
-			// check if color is enabled
+		// check if arg is a secret
+		if mask, ok := s.secrets[arg]; ok {
 			if s.enableColor {
-				if j == 0 {
-					token = pterm.FgLightMagenta.Sprint(token)
-				} else if token == "--" {
-					token = pterm.FgLightCyan.Sprint(token)
-				} else if strings.HasPrefix(token, "-") && !strings.HasPrefix(token, "---") {
-					token = pterm.FgLightYellow.Sprint(token)
-				}
+				mask = pterm.FgLightRed.Sprint(mask)
 			}
-			buf.WriteString(token)
+			buf.WriteString(mask)
+			continue
 		}
+
+		// check if arg is a multiline string
+		if strings.Contains(arg, "\n") {
+			if strings.Contains(arg, `"`) && strings.Contains(arg, `'`) {
+				arg = fmt.Sprintf(`$'%s'`, arg)
+			} else if strings.Contains(arg, `"`) {
+				arg = fmt.Sprintf(`'%s'`, arg)
+			} else {
+				arg = fmt.Sprintf(`"%s"`, arg)
+			}
+		}
+
+		// check if color is enabled
+		if s.enableColor {
+			if arg == "--" {
+				arg = pterm.FgLightCyan.Sprint(arg)
+			} else if strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "---") {
+				arg = pterm.FgLightYellow.Sprint(arg)
+			}
+		}
+		buf.WriteString(arg)
 	}
 	buf.WriteByte('\n')
 
