@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/cockroachdb/errors"
 	"mvdan.cc/sh/v3/shell"
@@ -58,7 +59,7 @@ func Tracer(t tracer.Tracer) Handler {
 // WithReader returns a Handler that sets the reader
 func WithReader(r io.Reader) Handler {
 	var (
-		name = "read"
+		name = "with_reader"
 		args []string
 	)
 
@@ -177,6 +178,60 @@ func Tee(w ...io.Writer) Handler {
 		_, err := io.Copy(io.MultiWriter(w...), r)
 		return &buf, err
 	})
+}
+
+// writeFileWithFlag returns a Handler that writes to a file with flag
+func writeFileWithFlag(name string, flag int, path ...string) Handler {
+	if len(path) == 0 {
+		panic("no path specified")
+	}
+	return HandlerFunc(func(c *Context, in any) (any, error) {
+		if in == nil {
+			return nil, errors.New("input is nil")
+		}
+		var r io.Reader
+		r, ok := in.(io.Reader)
+		if !ok {
+			return nil, errors.New("input is not io.Reader")
+		}
+
+		ff := make([]*os.File, len(path))
+		ww := make([]io.Writer, len(path))
+		for i := range path {
+			if filepath.IsLocal(path[i]) {
+				path[i] = filepath.Join(c.Workdir(), path[i])
+			}
+			f, err := os.OpenFile(path[i], flag, 0644)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to open file")
+			}
+			ff = append(ff, f)
+			ww = append(ww, f)
+		}
+
+		c.Tracer().Trace(name, path...)
+
+		_, err := io.Copy(io.MultiWriter(ww...), r)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to write to file")
+		}
+
+		for _, f := range ff {
+			_ = f.Close()
+		}
+
+		return nil, nil
+	})
+}
+
+// WriteFile returns a Handler that writes to a file
+func WriteFile(path ...string) Handler {
+	return writeFileWithFlag("write_file", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, path...)
+}
+
+// AppendFile returns a Handler that appends to a file
+func AppendFile(path ...string) Handler {
+	return writeFileWithFlag("append_file", os.O_WRONLY|os.O_CREATE|os.O_APPEND, path...)
 }
 
 // Unmarshal returns a Handler that unmarshal the input
