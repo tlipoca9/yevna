@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"regexp"
 
 	"github.com/tlipoca9/yevna"
@@ -38,11 +39,34 @@ func GoMainFiles() ([]GoFile, error) {
 	return ret, nil
 }
 
+func FilterSameDirFile(files []GoFile) []GoFile {
+	visit := make(map[string]GoFile)
+	for _, file := range files {
+		dir := filepath.Dir(file.Path)
+		name := filepath.Base(file.Path)
+		if name == "main.go" {
+			visit[dir] = file
+			continue
+		}
+		if _, ok := visit[dir]; !ok {
+			visit[dir] = file
+		}
+	}
+
+	var ret []GoFile
+	for _, v := range visit {
+		ret = append(ret, v)
+	}
+
+	return ret
+}
+
 func GetMissingFiles() (map[string][]string, error) {
 	goFiles, err := GoMainFiles()
 	if err != nil {
 		return nil, err
 	}
+	goFiles = FilterSameDirFile(goFiles)
 	missingFiles := make(map[string][]string, len(autoModules))
 	for _, mod := range autoModules {
 		missingFiles[mod] = []string{}
