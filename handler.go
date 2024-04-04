@@ -8,9 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"slices"
-	"strings"
 
 	"github.com/cockroachdb/errors"
 	"mvdan.cc/sh/v3/shell"
@@ -341,41 +339,10 @@ func Cat(path string) Handler {
 	})
 }
 
-// Sed returns a Handler that performs a sed-like operation
-// It supports the following flags:
-//   - "i", "insert": insert a line before the matched line
-//   - "a", "append": append a line after the matched line
-//   - "r", "replace": replace the string with another string in the matched line
-//
-// Usage:
-//   - insert <regexp> foo: insert "foo" before the matched line
-//   - append <regexp> foo: append "foo" after the matched line
-//   - replace <regexp> foo bar: replace "foo" with "bar" in the matched line
-func Sed(flag string, match *regexp.Regexp, a ...string) Handler {
-	if len(a) == 0 {
-		panic("no arguments specified")
-	}
+// Sed returns a Handler that applies the callback function to each line
+func Sed(cb func(line string) string) Handler {
 	name := "sed"
-	args := []string{fmt.Sprintf("<%T>", match)}
-	switch flag {
-	case "i", "insert":
-		if len(a) != 1 {
-			panic("invalid number of arguments")
-		}
-		args = append(args, "--insert", a[0])
-	case "a", "append":
-		if len(a) != 1 {
-			panic("invalid number of arguments")
-		}
-		args = append(args, "--append", a[0])
-	case "r", "replace":
-		if len(a) != 2 {
-			panic("invalid number of arguments")
-		}
-		args = append(args, "--replace", a[0], a[1])
-	default:
-		panic("invalid flag")
-	}
+	args := []string{fmt.Sprintf("<%T>", cb)}
 	return HandlerFunc(func(c *Context, in any) (any, error) {
 		if in == nil {
 			return nil, errors.New("input is nil")
@@ -392,22 +359,9 @@ func Sed(flag string, match *regexp.Regexp, a ...string) Handler {
 		scanner := bufio.NewScanner(r)
 		scanner.Split(bufio.ScanLines)
 		for scanner.Scan() {
-			line := scanner.Text()
-			if !match.MatchString(line) {
-				buf.WriteString(line + "\n")
-				continue
-			}
-			switch flag {
-			case "i", "insert":
-				buf.WriteString(a[0] + "\n")
-				buf.WriteString(line + "\n")
-			case "a", "append":
-				buf.WriteString(line + "\n")
-				buf.WriteString(a[0] + "\n")
-			case "r", "replace":
-				line = strings.ReplaceAll(line, a[0], a[1])
-				buf.WriteString(line + "\n")
-			}
+			line := cb(scanner.Text())
+			buf.WriteString(line)
+			buf.WriteByte('\n')
 		}
 		if err := scanner.Err(); err != nil {
 			return nil, errors.Wrap(err, "failed to scan")

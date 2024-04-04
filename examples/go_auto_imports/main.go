@@ -64,6 +64,8 @@ func GetMissingFiles() (map[string][]string, error) {
 }
 
 func main() {
+	importLineRegex := regexp.MustCompile(`^import\s*\(\s*$`)
+
 	missingFiles, err := GetMissingFiles()
 	if err != nil {
 		panic(err)
@@ -76,11 +78,12 @@ func main() {
 			err = yevna.Run(
 				context.Background(),
 				yevna.Cat(file),
-				yevna.Sed(
-					"a",
-					regexp.MustCompile(`^import\s*\(\s*$`),
-					fmt.Sprintf("\t_ \"%s\"", mod),
-				),
+				yevna.Sed(func(line string) string {
+					if importLineRegex.MatchString(line) {
+						return fmt.Sprintf("%s\n\t_ \"%s\"", line, mod)
+					}
+					return line
+				}),
 				yevna.WriteFile(file),
 			)
 			if err != nil {
