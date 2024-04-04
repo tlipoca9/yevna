@@ -1,12 +1,16 @@
 package yevna
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"slices"
+	"strings"
 
 	"github.com/cockroachdb/errors"
 	"mvdan.cc/sh/v3/shell"
@@ -19,9 +23,7 @@ import (
 type HandlersChain []Handler
 
 func (c HandlersChain) Copy() HandlersChain {
-	h := make(HandlersChain, len(c))
-	copy(h, c)
-	return h
+	return slices.Clone(c)
 }
 
 type Handler interface {
@@ -227,8 +229,8 @@ func writeFileWithFlag(name string, flag int, path ...string) Handler {
 			return nil, errors.New("input is not io.Reader")
 		}
 
-		ff := make([]*os.File, len(path))
-		ww := make([]io.Writer, len(path))
+		ff := make([]*os.File, 0, len(path))
+		ww := make([]io.Writer, 0, len(path))
 		for i := range path {
 			if filepath.IsLocal(path[i]) {
 				path[i] = filepath.Join(c.Workdir(), path[i])
@@ -321,5 +323,88 @@ func IfExists(path ...string) Handler {
 			}
 		}
 		return in, nil
+	})
+}
+
+func ReadAll(path string) Handler {
+	return HandlerFunc(func(c *Context, _ any) (any, error) {
+		if filepath.IsLocal(path) {
+			path = filepath.Join(c.Workdir(), path)
+		}
+		f, err := os.Open(path)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to open file")
+		}
+		buf, err := io.ReadAll(f)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to read file")
+		}
+		return bytes.NewBuffer(buf), nil
+	})
+}
+
+func Sed(flag string, match *regexp.Regexp, a ...string) Handler {
+	if len(a) == 0 {
+		panic("no arguments specified")
+	}
+	name := "sed"
+	var args []string
+	switch flag {
+	case "i", "insert":
+		if len(a) != 1 {
+			panic("invalid number of arguments")
+		}
+		args = append(args, "--insert", a[0])
+	case "a", "append":
+		if len(a) != 1 {
+			panic("invalid number of arguments")
+		}
+		args = append(args, "--append", a[0])
+	case "r", "replace":
+		if len(a) != 2 {
+			panic("invalid number of arguments")
+		}
+		args = append(args, "--replace", a[0], a[1])
+	default:
+		panic("invalid flag")
+	}
+	return HandlerFunc(func(c *Context, in any) (any, error) {
+		if in == nil {
+			return nil, errors.New("input is nil")
+		}
+		var r io.Reader
+		r, ok := in.(io.Reader)
+		if !ok {
+			return nil, errors.New("input is not io.Reader")
+		}
+
+		c.Tracer().Trace(name, args...)
+
+		var buf bytes.Buffer
+		scanner := bufio.NewScanner(r)
+		scanner.Split(bufio.ScanLines)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if !match.MatchString(line) {
+				buf.WriteString(line + "\n")
+				continue
+			}
+			switch flag {
+			case "i", "insert":
+				buf.WriteString(a[0] + "\n")
+				buf.WriteString(line + "\n")
+			case "a", "append":
+				buf.WriteString(line + "\n")
+				buf.WriteString(a[0] + "\n")
+			case "r", "replace":
+				line = strings.ReplaceAll(line, a[0], a[1])
+				buf.WriteString(line + "\n")
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			return nil, errors.Wrap(err, "failed to scan")
+		}
+
+		return &buf, nil
 	})
 }
