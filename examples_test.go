@@ -29,7 +29,7 @@ func ExamplePanic() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Default context is configured with Recover handler
+	// Default context is configured with Recover and ErrorHandler
 	err := yevna.Run(
 		ctx,
 		yevna.HandlerFunc(func(_ *yevna.Context, _ any) (any, error) {

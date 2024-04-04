@@ -29,17 +29,26 @@ func (f HandlerFunc) Handle(c *Context, in any) (any, error) {
 	return f(c, in)
 }
 
+func ErrorHandler() Handler {
+	return HandlerFunc(func(c *Context, in any) (any, error) {
+		out, err := c.Next(in)
+		if err != nil {
+			fmt.Printf("%+v\n", err)
+		}
+		return out, err
+	})
+}
+
 // Recover returns a Handler that recovers from panic
 func Recover() Handler {
 	return HandlerFunc(func(c *Context, in any) (_ any, err error) {
 		defer func() {
 			if r := recover(); r != nil {
 				if e, ok := r.(error); ok {
-					err = e
+					err = errors.Wrap(e, "recovered from panic")
 				} else {
-					err = errors.Errorf("panic: %v", r)
+					err = errors.Newf("panic: %v", r)
 				}
-				fmt.Printf("recovered from panic: %+v\n", r)
 			}
 		}()
 		return c.Next(in)

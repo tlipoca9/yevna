@@ -64,7 +64,7 @@ func (c *Context) Next(in any) (any, error) {
 	for c.index < len(c.handlers) {
 		out, err := c.handlers[c.index].Handle(c, in)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to handle %d", c.index)
+			return nil, errors.Wrapf(err, "execute No.%d handler failed", c.index+1)
 		}
 		c.index++
 		in = out
