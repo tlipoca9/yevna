@@ -15,8 +15,6 @@ linters-settings:
     rewrite-rules:
       - pattern: 'interface{}'
         replacement: 'any'
-  goimports:
-    local-prefixes: github.com/tlipoca9/yevna
   revive:
     ignore-generated-header: true
     enable-all-rules: true
@@ -74,7 +72,6 @@ linters:
     - errcheck
     - gci
     - gofmt
-    - goimports
     - gosimple
     - gosec
     - govet
