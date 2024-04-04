@@ -340,7 +340,7 @@ func Cat(path string) Handler {
 }
 
 // Sed returns a Handler that applies the callback function to each line
-func Sed(cb func(line string) string) Handler {
+func Sed(cb func(i int, line string) string) Handler {
 	name := "sed"
 	args := []string{fmt.Sprintf("<%T>", cb)}
 	return HandlerFunc(func(c *Context, in any) (any, error) {
@@ -358,8 +358,8 @@ func Sed(cb func(line string) string) Handler {
 		var buf bytes.Buffer
 		scanner := bufio.NewScanner(r)
 		scanner.Split(bufio.ScanLines)
-		for scanner.Scan() {
-			line := cb(scanner.Text())
+		for i := 0; scanner.Scan(); i++ {
+			line := cb(i, scanner.Text())
 			buf.WriteString(line)
 			buf.WriteByte('\n')
 		}

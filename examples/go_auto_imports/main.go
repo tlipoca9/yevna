@@ -1,10 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"strings"
+
+	"github.com/cockroachdb/errors"
 
 	"github.com/tlipoca9/yevna"
 	"github.com/tlipoca9/yevna/parser"
@@ -88,7 +92,9 @@ func GetMissingFiles() (map[string][]string, error) {
 }
 
 func main() {
-	importLineRegex := regexp.MustCompile(`^import\s*\(\s*$`)
+	pkgRegex := regexp.MustCompile(`^package\s+.+$`)
+	importLinesRegex := regexp.MustCompile(`^import\s*\(\s*$`)
+	importLineRegex := regexp.MustCompile(`^import\s+"(.+)"\s*$`)
 
 	missingFiles, err := GetMissingFiles()
 	if err != nil {
@@ -99,17 +105,51 @@ func main() {
 			continue
 		}
 		for _, file := range files {
+			var found bool
 			err = yevna.Run(
 				context.Background(),
 				yevna.Cat(file),
-				yevna.Sed(func(line string) string {
-					if importLineRegex.MatchString(line) {
+				yevna.Sed(func(_ int, line string) string {
+					if found {
+						return line
+					}
+					if importLinesRegex.MatchString(line) {
+						found = true
 						return fmt.Sprintf("%s\n\t_ \"%s\"", line, mod)
+					}
+					if importLineRegex.MatchString(line) {
+						found = true
+						line, _ = strings.CutPrefix(line, "import")
+						line = strings.TrimSpace(line)
+						var buf bytes.Buffer
+						buf.WriteString("import (\n")
+						buf.WriteString(fmt.Sprintf("\t_ \"%s\"\n", mod))
+						buf.WriteString(fmt.Sprintf("\t%s\n", line))
+						buf.WriteString(")")
+						return buf.String()
+					}
+					return line
+				}),
+				yevna.Sed(func(_ int, line string) string {
+					if found {
+						return line
+					}
+					if pkgRegex.MatchString(line) {
+						found = true
+						var buf bytes.Buffer
+						buf.WriteString(line + "\n")
+						buf.WriteString("import (\n")
+						buf.WriteString(fmt.Sprintf("\t_ \"%s\"\n", mod))
+						buf.WriteString(")")
+						return buf.String()
 					}
 					return line
 				}),
 				yevna.WriteFile(file),
 			)
+			if err == nil && !found {
+				err = errors.New("failed to add import")
+			}
 			if err != nil {
 				panic(err)
 			}
