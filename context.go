@@ -78,7 +78,7 @@ func (c *Context) copy() *Context {
 		tracer:   c.tracer,
 		workdir:  c.workdir,
 		index:    -1,
-		handlers: c.handlers,
+		handlers: c.handlers.Copy(),
 	}
 	return cc
 }

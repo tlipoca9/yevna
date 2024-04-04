@@ -18,6 +18,12 @@ import (
 // HandlersChain defines a Handler slice
 type HandlersChain []Handler
 
+func (c HandlersChain) Copy() HandlersChain {
+	h := make(HandlersChain, len(c))
+	copy(h, c)
+	return h
+}
+
 type Handler interface {
 	Handle(c *Context, in any) (any, error)
 }
