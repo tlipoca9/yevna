@@ -74,7 +74,7 @@ func (s *ExecTracer) Trace(name string, args ...string) {
 		}
 
 		// check if arg is a multiline string
-		if strings.Contains(arg, "\n") {
+		if strings.ContainsAny(arg, " \n") {
 			if strings.Contains(arg, `"`) && strings.Contains(arg, `'`) {
 				arg = fmt.Sprintf(`$'%s'`, arg)
 			} else if strings.Contains(arg, `"`) {

@@ -75,7 +75,7 @@ func main() {
 		for _, file := range files {
 			err = yevna.Run(
 				context.Background(),
-				yevna.ReadAll(file),
+				yevna.Cat(file),
 				yevna.Sed(
 					"a",
 					regexp.MustCompile(`^import\s*\(\s*$`),

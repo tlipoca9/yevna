@@ -326,23 +326,31 @@ func IfExists(path ...string) Handler {
 	})
 }
 
-func ReadAll(path string) Handler {
+// Cat returns a Handler that reads a file
+func Cat(path string) Handler {
 	return HandlerFunc(func(c *Context, _ any) (any, error) {
 		if filepath.IsLocal(path) {
 			path = filepath.Join(c.Workdir(), path)
 		}
+		c.Tracer().Trace("cat", path)
 		f, err := os.Open(path)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to open file")
 		}
-		buf, err := io.ReadAll(f)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to read file")
-		}
-		return bytes.NewBuffer(buf), nil
+		return f, nil
 	})
 }
 
+// Sed returns a Handler that performs a sed-like operation
+// It supports the following flags:
+//   - "i", "insert": insert a line before the matched line
+//   - "a", "append": append a line after the matched line
+//   - "r", "replace": replace the string with another string in the matched line
+//
+// Usage:
+//   - insert <regexp> foo: insert "foo" before the matched line
+//   - append <regexp> foo: append "foo" after the matched line
+//   - replace <regexp> foo bar: replace "foo" with "bar" in the matched line
 func Sed(flag string, match *regexp.Regexp, a ...string) Handler {
 	if len(a) == 0 {
 		panic("no arguments specified")
