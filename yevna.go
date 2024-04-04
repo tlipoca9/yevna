@@ -2,9 +2,10 @@ package yevna
 
 import (
 	"context"
-	"github.com/tlipoca9/yevna/tracer"
 	"os"
 	"sync/atomic"
+
+	"github.com/tlipoca9/yevna/tracer"
 )
 
 var defaultContext atomic.Pointer[Context]

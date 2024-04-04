@@ -92,7 +92,6 @@ func (c *Context) Run(ctx context.Context, handlers ...Handler) error {
 
 func New() *Context {
 	return &Context{
-		ctx:    context.Background(),
 		silent: false,
 		tracer: tracer.Discard,
 	}
