@@ -8,6 +8,7 @@ import (
 	"os/exec"
 
 	"github.com/cockroachdb/errors"
+	"mvdan.cc/sh/v3/shell"
 
 	"github.com/tlipoca9/yevna/parser"
 	"github.com/tlipoca9/yevna/tracer"
@@ -54,10 +55,10 @@ func Tracer(t tracer.Tracer) Handler {
 	})
 }
 
-// Echo returns a Handler that echoes the input
-func Echo(r io.Reader) Handler {
+// WithReader returns a Handler that sets the reader
+func WithReader(r io.Reader) Handler {
 	var (
-		name = "echo"
+		name = "read"
 		args []string
 	)
 
@@ -70,6 +71,14 @@ func Echo(r io.Reader) Handler {
 	return HandlerFunc(func(c *Context, _ any) (any, error) {
 		c.Tracer().Trace(name, args...)
 		return r, nil
+	})
+}
+
+// Echo returns a Handler that echoes the string
+func Echo(s string) Handler {
+	return HandlerFunc(func(c *Context, _ any) (any, error) {
+		c.Tracer().Trace("echo", s)
+		return bytes.NewBufferString(s), nil
 	})
 }
 
@@ -97,7 +106,7 @@ func Exec(name string, args ...string) Handler {
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to get stdout pipe")
 		}
-		if err := cmd.Start(); err != nil {
+		if err = cmd.Start(); err != nil {
 			return nil, errors.Wrapf(err, "failed to start command")
 		}
 		res, err := c.Next(stdout)
@@ -108,6 +117,24 @@ func Exec(name string, args ...string) Handler {
 
 		return res, cmd.Wait()
 	})
+}
+
+// Execs returns a Handler that executes a command
+func Execs(cmd string) Handler {
+	return HandlerFunc(func(c *Context, in any) (any, error) {
+		args, err := shell.Fields(cmd, nil)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to parse command")
+		}
+
+		return Exec(args[0], args[1:]...).Handle(c, in)
+	})
+}
+
+// Execf returns a Handler that executes a command
+// It is a shortcut for Execs(fmt.Sprintf(format, a...))
+func Execf(format string, a ...any) Handler {
+	return Execs(fmt.Sprintf(format, a...))
 }
 
 // Tee returns a Handler that writes to multiple writers

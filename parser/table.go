@@ -12,27 +12,28 @@ import (
 
 type TableHeader string
 
-func (h TableHeader) Index(isSeparator func(rune) bool, lines []string) ([][2]int, error) {
+func (h TableHeader) Index(isSep func(rune) bool, lines []string) ([][2]int, error) {
 	ret := make([][2]int, 0)
-	headersMap := make([]bool, len(h)+1)
+	sepMap := make([]bool, len(h)+1)
 	for i, c := range h {
-		if !isSeparator(c) {
-			headersMap[i] = true
+		if !isSep(c) {
+			sepMap[i] = true
 		}
 	}
+
 	for _, line := range lines {
-		if len(headersMap) < len(line)+1 {
-			headersMap = append(headersMap, make([]bool, len(line)+1-len(headersMap))...)
+		if len(sepMap) < len(line)+1 {
+			sepMap = append(sepMap, make([]bool, len(line)+1-len(sepMap))...)
 		}
 		for i, c := range line {
-			if !isSeparator(c) {
-				headersMap[i] = true
+			if !sepMap[i] && !isSep(c) {
+				sepMap[i] = true
 			}
 		}
 	}
 
 	i := 0
-	for idx, v := range headersMap {
+	for idx, v := range sepMap {
 		if i != -1 && !v {
 			ret = append(ret, [2]int{i, idx})
 			i = -1
@@ -49,16 +50,20 @@ func (h TableHeader) Index(isSeparator func(rune) bool, lines []string) ([][2]in
 
 // TableParser is a builder for the TableParser
 type TableParser struct {
-	conf             *mapstructure.DecoderConfig
-	separatorFunc    func(rune) bool
-	filter           func(i int, line string) bool
-	keyTransformFunc func(string) string
-	valTransformFunc func(string) string
-	headerTxt        string
+	conf      *mapstructure.DecoderConfig
+	sepFunc   func(rune) bool
+	filter    func(i int, line string) bool
+	cb        func(k, v string) (string, string)
+	headerTxt string
 }
 
-func (p *TableParser) WithSeparatorFunc(f func(rune) bool) *TableParser {
-	p.separatorFunc = f
+func (p *TableParser) WithDecoderConfig(conf *mapstructure.DecoderConfig) *TableParser {
+	p.conf = conf
+	return p
+}
+
+func (p *TableParser) WithSepFunc(f func(rune) bool) *TableParser {
+	p.sepFunc = f
 	return p
 }
 
@@ -67,13 +72,8 @@ func (p *TableParser) WithFilter(f func(i int, line string) bool) *TableParser {
 	return p
 }
 
-func (p *TableParser) WithKeyTransformFunc(f func(string) string) *TableParser {
-	p.keyTransformFunc = f
-	return p
-}
-
-func (p *TableParser) WithValTransformFunc(f func(string) string) *TableParser {
-	p.valTransformFunc = f
+func (p *TableParser) WithCallback(f func(k, v string) (string, string)) *TableParser {
+	p.cb = f
 	return p
 }
 
@@ -83,17 +83,16 @@ func (p *TableParser) WithHeader(header string) *TableParser {
 }
 
 func (p *TableParser) lazyInit() {
-	if p.separatorFunc == nil {
-		p.separatorFunc = unicode.IsSpace
+	if p.sepFunc == nil {
+		p.sepFunc = unicode.IsSpace
 	}
 	if p.filter == nil {
 		p.filter = func(_ int, _ string) bool { return true }
 	}
-	if p.keyTransformFunc == nil {
-		p.keyTransformFunc = func(s string) string { return strings.TrimFunc(s, p.separatorFunc) }
-	}
-	if p.valTransformFunc == nil {
-		p.valTransformFunc = func(s string) string { return strings.TrimFunc(s, p.separatorFunc) }
+	if p.cb == nil {
+		p.cb = func(k, v string) (string, string) {
+			return strings.TrimFunc(k, p.sepFunc), strings.TrimFunc(v, p.sepFunc)
+		}
 	}
 	if p.conf == nil {
 		p.conf = &mapstructure.DecoderConfig{TagName: "json"}
@@ -118,7 +117,7 @@ func (p *TableParser) Unmarshal(b []byte, obj any) error {
 		return errors.Wrap(err, "failed to create decoder")
 	}
 
-	// get the maximum length of the line
+	// filter the lines
 	scanner := bufio.NewScanner(bytes.NewReader(b))
 	lines := make([]string, 0)
 	for i := 0; scanner.Scan(); i++ {
@@ -133,6 +132,7 @@ func (p *TableParser) Unmarshal(b []byte, obj any) error {
 		return nil
 	}
 
+	// parse the header
 	headerTxt := p.headerTxt
 	if len(headerTxt) == 0 {
 		headerTxt, lines = lines[0], lines[1:]
@@ -141,7 +141,7 @@ func (p *TableParser) Unmarshal(b []byte, obj any) error {
 		}
 	}
 	header := TableHeader(headerTxt)
-	headerIndex, err := header.Index(p.separatorFunc, lines)
+	headerIndex, err := header.Index(p.sepFunc, lines)
 	if err != nil {
 		return errors.Wrap(err, "failed to parse header")
 	}
@@ -151,8 +151,9 @@ func (p *TableParser) Unmarshal(b []byte, obj any) error {
 	for _, line := range lines {
 		item := make(map[string]any, len(headerIndex))
 		for _, h := range headerIndex {
-			k := p.keyTransformFunc(headerTxt[h[0]:min(h[1], len(headerTxt))])
-			v := p.valTransformFunc(line[h[0]:min(h[1], len(line))])
+			k := headerTxt[h[0]:min(h[1], len(headerTxt))]
+			v := line[h[0]:min(h[1], len(line))]
+			k, v = p.cb(k, v)
 			item[k] = v
 		}
 		ret = append(ret, item)

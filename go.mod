@@ -12,6 +12,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.17.0
 	github.com/onsi/gomega v1.32.0
 	github.com/pterm/pterm v0.12.79
+	mvdan.cc/sh/v3 v3.8.0
 )
 
 require (

@@ -53,6 +53,21 @@ var _ = Describe("Handler", func() {
 		buf = &bytes.Buffer{}
 	})
 
+	Context("Cd", func() {
+		It("should change working directory for the command", func() {
+			wd, err := os.Getwd()
+			Expect(err).To(BeNil())
+			err = y.Run(
+				context.Background(),
+				yevna.Cd(filepath.Join(wd, "parser")),
+				yevna.Exec("pwd"),
+				yevna.Tee(buf),
+			)
+			Expect(err).To(BeNil())
+			Expect(buf.String()).To(Equal(filepath.Join(wd, "parser") + "\n"))
+		})
+	})
+
 	Context("Silent", func() {
 		It("should set the silent mode", func() {
 			err := y.Run(
@@ -67,11 +82,11 @@ var _ = Describe("Handler", func() {
 		})
 	})
 
-	Context("Echo", func() {
-		It("should set the stdin for the command", func() {
+	Context("WithReader", func() {
+		It("should success", func() {
 			err := y.Run(
 				context.Background(),
-				yevna.Echo(strings.NewReader("hello")),
+				yevna.WithReader(strings.NewReader("hello")),
 				yevna.Exec("cat"),
 				yevna.Tee(buf),
 			)
@@ -80,8 +95,20 @@ var _ = Describe("Handler", func() {
 		})
 	})
 
-	Context("normal", func() {
-		It("should set the stdout for the command", func() {
+	Context("Echo", func() {
+		It("should success", func() {
+			err := y.Run(
+				context.Background(),
+				yevna.Echo("hello"),
+				yevna.Tee(buf),
+			)
+			Expect(err).To(BeNil())
+			Expect(buf.String()).To(Equal("hello"))
+		})
+	})
+
+	Context("Exec", func() {
+		It("should success", func() {
 			err := y.Run(
 				context.Background(),
 				yevna.Exec("echo", "hello"),
@@ -92,22 +119,31 @@ var _ = Describe("Handler", func() {
 		})
 	})
 
-	Context("chdir", func() {
-		It("should set the working directory for the command", func() {
-			wd, err := os.Getwd()
-			Expect(err).To(BeNil())
-			err = y.Run(
+	Context("Execs", func() {
+		It("should success", func() {
+			err := y.Run(
 				context.Background(),
-				yevna.Cd(filepath.Join(wd, "parser")),
-				yevna.Exec("pwd"),
+				yevna.Execs("echo 'hello world'"),
 				yevna.Tee(buf),
 			)
 			Expect(err).To(BeNil())
-			Expect(buf.String()).To(Equal(filepath.Join(wd, "parser") + "\n"))
+			Expect(buf.String()).To(Equal("hello world\n"))
 		})
 	})
 
-	Context("unmarshal", func() {
+	Context("Execf", func() {
+		It("should success", func() {
+			err := y.Run(
+				context.Background(),
+				yevna.Execf("echo '%s %s'", "hello", "world"),
+				yevna.Tee(buf),
+			)
+			Expect(err).To(BeNil())
+			Expect(buf.String()).To(Equal("hello world\n"))
+		})
+	})
+
+	Context("Unmarshal", func() {
 		When("input is json", func() {
 			It("should return expected object", func() {
 				var got map[string]any
