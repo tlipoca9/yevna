@@ -356,7 +356,7 @@ func Sed(flag string, match *regexp.Regexp, a ...string) Handler {
 		panic("no arguments specified")
 	}
 	name := "sed"
-	var args []string
+	args := []string{fmt.Sprintf("<%T>", match)}
 	switch flag {
 	case "i", "insert":
 		if len(a) != 1 {
