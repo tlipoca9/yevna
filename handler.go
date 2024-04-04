@@ -29,6 +29,23 @@ func (f HandlerFunc) Handle(c *Context, in any) (any, error) {
 	return f(c, in)
 }
 
+// Recover returns a Handler that recovers from panic
+func Recover() Handler {
+	return HandlerFunc(func(c *Context, in any) (_ any, err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				if e, ok := r.(error); ok {
+					err = e
+				} else {
+					err = errors.Errorf("panic: %v", r)
+				}
+				fmt.Printf("recovered from panic: %+v\n", r)
+			}
+		}()
+		return c.Next(in)
+	})
+}
+
 // Cd returns a Handler that changes the working directory
 func Cd(path string) Handler {
 	name := "cd"
@@ -273,5 +290,21 @@ func Unmarshal(p parser.Parser, v any) Handler {
 		}
 
 		return v, nil
+	})
+}
+
+// IfExists returns a Handler that checks if the file exists
+func IfExists(path ...string) Handler {
+	return HandlerFunc(func(c *Context, in any) (any, error) {
+		for _, p := range path {
+			if filepath.IsLocal(p) {
+				p = filepath.Join(c.Workdir(), p)
+			}
+			_, err := os.Stat(p)
+			if err != nil {
+				return nil, errors.Wrapf(err, "file %s does not exist", p)
+			}
+		}
+		return in, nil
 	})
 }

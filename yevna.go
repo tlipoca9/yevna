@@ -19,7 +19,7 @@ func SetDefault(c *Context) {
 }
 
 func init() {
-	c := New()
+	c := New().Use(Recover())
 	c.Tracer(tracer.NewExecTracer(os.Stderr))
 	SetDefault(c)
 }

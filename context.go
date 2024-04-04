@@ -74,18 +74,24 @@ func (c *Context) Next(in any) (any, error) {
 
 func (c *Context) copy() *Context {
 	cc := &Context{
-		silent:  c.silent,
-		tracer:  c.tracer,
-		workdir: c.workdir,
-		index:   -1,
+		silent:   c.silent,
+		tracer:   c.tracer,
+		workdir:  c.workdir,
+		index:    -1,
+		handlers: c.handlers,
 	}
 	return cc
+}
+
+func (c *Context) Use(handles ...Handler) *Context {
+	c.handlers = append(c.handlers, handles...)
+	return c
 }
 
 func (c *Context) Run(ctx context.Context, handlers ...Handler) error {
 	cc := c.copy()
 	cc.ctx = ctx
-	cc.handlers = handlers
+	cc.handlers = append(cc.handlers, handlers...)
 	_, err := cc.Next(nil)
 	return err
 }
