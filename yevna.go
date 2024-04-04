@@ -2,6 +2,8 @@ package yevna
 
 import (
 	"context"
+	"github.com/tlipoca9/yevna/tracer"
+	"os"
 	"sync/atomic"
 )
 
@@ -16,7 +18,9 @@ func SetDefault(c *Context) {
 }
 
 func init() {
-	SetDefault(New())
+	c := New()
+	c.Tracer(tracer.NewExecTracer(os.Stderr))
+	SetDefault(c)
 }
 
 func Run(ctx context.Context, handlers ...Handler) error {
