@@ -63,7 +63,7 @@ func Recover() Handler {
 
 // Cd returns a Handler that changes the working directory
 func Cd(path string) Handler {
-	name := "cd"
+	name := "~cd"
 	args := []string{path}
 	return HandlerFunc(func(c *Context, in any) (any, error) {
 		c.Tracer().Trace(name, args...)
@@ -91,7 +91,7 @@ func Tracer(t tracer.Tracer) Handler {
 // WithReader returns a Handler that sets the reader
 func WithReader(r io.Reader) Handler {
 	var (
-		name = "with_reader"
+		name = "~with_reader"
 		args []string
 	)
 
@@ -110,7 +110,7 @@ func WithReader(r io.Reader) Handler {
 // Echo returns a Handler that echoes the string
 func Echo(s string) Handler {
 	return HandlerFunc(func(c *Context, _ any) (any, error) {
-		c.Tracer().Trace("echo", s)
+		c.Tracer().Trace("~echo", s)
 		return bytes.NewBufferString(s), nil
 	})
 }
@@ -118,6 +118,8 @@ func Echo(s string) Handler {
 // Exec returns a Handler that executes a command
 func Exec(name string, args ...string) Handler {
 	return HandlerFunc(func(c *Context, in any) (any, error) {
+		c.Tracer().Trace(name, args...)
+
 		var r io.Reader
 		if in != nil {
 			var ok bool
@@ -126,8 +128,6 @@ func Exec(name string, args ...string) Handler {
 				return nil, errors.New("input is not io.Reader")
 			}
 		}
-
-		c.Tracer().Trace(name, args...)
 
 		cmd := exec.CommandContext(c.Context(), name, args...)
 		cmd.Dir = c.Workdir()
@@ -173,7 +173,7 @@ func Execf(format string, a ...any) Handler {
 // Tee returns a Handler that writes to multiple writers
 func Tee(w ...io.Writer) Handler {
 	var (
-		name = "tee"
+		name = "~tee"
 		args []string
 	)
 	for _, writer := range w {
@@ -194,6 +194,8 @@ func Tee(w ...io.Writer) Handler {
 		args = append(args, fmt.Sprintf("<%d other writers>", len(w)-len(args)))
 	}
 	return HandlerFunc(func(c *Context, in any) (any, error) {
+		c.Tracer().Trace(name, args...)
+
 		if in == nil {
 			return nil, errors.New("input is nil")
 		}
@@ -202,8 +204,6 @@ func Tee(w ...io.Writer) Handler {
 		if !ok {
 			return nil, errors.New("input is not io.Reader")
 		}
-
-		c.Tracer().Trace(name, args...)
 
 		var buf bytes.Buffer
 		w = append(w, &buf)
@@ -218,6 +218,8 @@ func writeFileWithFlag(name string, flag int, path ...string) Handler {
 		panic("no path specified")
 	}
 	return HandlerFunc(func(c *Context, in any) (any, error) {
+		c.Tracer().Trace(name, path...)
+
 		if in == nil {
 			return nil, errors.New("input is nil")
 		}
@@ -241,8 +243,6 @@ func writeFileWithFlag(name string, flag int, path ...string) Handler {
 			ww = append(ww, f)
 		}
 
-		c.Tracer().Trace(name, path...)
-
 		_, err := io.Copy(io.MultiWriter(ww...), r)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to write to file")
@@ -258,21 +258,23 @@ func writeFileWithFlag(name string, flag int, path ...string) Handler {
 
 // WriteFile returns a Handler that writes to a file
 func WriteFile(path ...string) Handler {
-	return writeFileWithFlag("write_file", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, path...)
+	return writeFileWithFlag("~write_file", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, path...)
 }
 
 // AppendFile returns a Handler that appends to a file
 func AppendFile(path ...string) Handler {
-	return writeFileWithFlag("append_file", os.O_WRONLY|os.O_CREATE|os.O_APPEND, path...)
+	return writeFileWithFlag("~append_file", os.O_WRONLY|os.O_CREATE|os.O_APPEND, path...)
 }
 
 // Unmarshal returns a Handler that unmarshal the input
 func Unmarshal(p parser.Parser, v any) Handler {
 	var (
-		name = "unmarshal"
-		args = []string{fmt.Sprintf("%T", v)}
+		name = "~unmarshal"
+		args = []string{fmt.Sprintf("<%T>", v)}
 	)
 	return HandlerFunc(func(c *Context, in any) (any, error) {
+		c.Tracer().Trace(name, args...)
+
 		if in == nil {
 			return nil, errors.New("input is nil")
 		}
@@ -297,8 +299,6 @@ func Unmarshal(p parser.Parser, v any) Handler {
 			return nil, errors.New("input is not io.Reader, []byte or string")
 		}
 
-		c.Tracer().Trace(name, args...)
-
 		err := p.Unmarshal(b.Bytes(), v)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to unmarshal")
@@ -310,7 +310,11 @@ func Unmarshal(p parser.Parser, v any) Handler {
 
 // IfExists returns a Handler that checks if the file exists
 func IfExists(path ...string) Handler {
+	name := "~if_exists"
+	args := path
 	return HandlerFunc(func(c *Context, in any) (any, error) {
+		c.Tracer().Trace(name, args...)
+
 		for _, p := range path {
 			if filepath.IsLocal(p) {
 				p = filepath.Join(c.Workdir(), p)
@@ -326,11 +330,14 @@ func IfExists(path ...string) Handler {
 
 // Cat returns a Handler that reads a file
 func Cat(path string) Handler {
+	name := "~cat"
+	args := []string{path}
 	return HandlerFunc(func(c *Context, _ any) (any, error) {
+		c.Tracer().Trace(name, args...)
+
 		if filepath.IsLocal(path) {
 			path = filepath.Join(c.Workdir(), path)
 		}
-		c.Tracer().Trace("cat", path)
 		f, err := os.Open(path)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to open file")
@@ -341,9 +348,11 @@ func Cat(path string) Handler {
 
 // Sed returns a Handler that applies the callback function to each line
 func Sed(cb func(i int, line string) string) Handler {
-	name := "sed"
+	name := "~sed"
 	args := []string{fmt.Sprintf("<%T>", cb)}
 	return HandlerFunc(func(c *Context, in any) (any, error) {
+		c.Tracer().Trace(name, args...)
+
 		if in == nil {
 			return nil, errors.New("input is nil")
 		}
@@ -352,8 +361,6 @@ func Sed(cb func(i int, line string) string) Handler {
 		if !ok {
 			return nil, errors.New("input is not io.Reader")
 		}
-
-		c.Tracer().Trace(name, args...)
 
 		var buf bytes.Buffer
 		scanner := bufio.NewScanner(r)
