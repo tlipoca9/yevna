@@ -102,7 +102,10 @@ var _ = Describe("JSONParser", func() {
 				buf := []byte(`[{"FOO":"BAR"},{"BAZ":"QUX"}]`)
 				err := p.Unmarshal(buf, &got)
 				Expect(err).To(BeNil())
-				Expect(got).To(Equal([]any{map[string]any{"FOO": "BAR"}, map[string]any{"BAZ": "QUX"}}))
+				Expect(got).To(Equal([]any{
+					map[string]any{"FOO": "BAR"},
+					map[string]any{"BAZ": "QUX"},
+				}))
 			})
 		})
 	})

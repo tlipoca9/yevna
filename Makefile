@@ -2,6 +2,7 @@
 lint:
 	go generate ./...
 	go mod tidy
+	golines -m 100 -l -w .
 	golangci-lint run --fix ./...
 	go list -f '{{ range .GoFiles }}{{ if eq $$.Name "main" }}{{ printf "%s/%s\n" $$.Dir . }}{{ end }}{{ end }}' ./... | xargs -I {} golangci-lint run --fix {}
 
@@ -12,3 +13,7 @@ test:
 .PHONY: bench
 bench:
 	command -v ginkgo && ginkgo run --label-filter=benchmark ./... || go test -bench=. ./...
+
+.PHONY: install-tools
+install-tools:
+	command -v golines || go install github.com/segmentio/golines@latest
