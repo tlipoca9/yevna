@@ -17,24 +17,29 @@ import (
 	"github.com/tlipoca9/yevna/tracer"
 )
 
-// HandlersChain defines a Handler slice
+// HandlersChain defines a Handler slice.
 type HandlersChain []Handler
 
+// Copy returns a copy of the HandlersChain.
 func (c HandlersChain) Copy() HandlersChain {
 	return slices.Clone(c)
 }
 
+// Handler is an interface that defines a handler.
 type Handler interface {
 	Handle(c *Context, in any) (any, error)
 }
 
-// HandlerFunc defines a function type that implements Handler
+// HandlerFunc defines a function type that implements Handler.
 type HandlerFunc func(c *Context, in any) (any, error)
 
+// Handle implements Handler.
 func (f HandlerFunc) Handle(c *Context, in any) (any, error) {
 	return f(c, in)
 }
 
+// ErrorHandler returns a Handler that handles error.
+// It prints the error using fmt.Printf("%+v\n", err).
 func ErrorHandler() Handler {
 	return HandlerFunc(func(c *Context, in any) (any, error) {
 		out, err := c.Next(in)
@@ -45,7 +50,8 @@ func ErrorHandler() Handler {
 	})
 }
 
-// Recover returns a Handler that recovers from panic
+// Recover returns a Handler that recovers from panic.
+// It wraps the panic error using errors.Wrap.
 func Recover() Handler {
 	return HandlerFunc(func(c *Context, in any) (_ any, err error) {
 		defer func() {
@@ -61,18 +67,27 @@ func Recover() Handler {
 	})
 }
 
-// Cd returns a Handler that changes the working directory
+// Cd returns a Handler that changes the working directory.
+// It uses IfExists to check if the path exists.
+// It sends the input to the next handler.
 func Cd(path string) Handler {
 	name := "~cd"
 	args := []string{path}
 	return HandlerFunc(func(c *Context, in any) (any, error) {
 		c.Tracer().Trace(name, args...)
+		_, err := IfExists(path).Handle(c, nil)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to change working directory")
+		}
 		c.Workdir(path)
 		return in, nil
 	})
 }
 
-// Silent returns a Handler that sets the silent flag
+// Silent returns a Handler that sets the silent flag.
+// If silent is true, Exec will not print stderr.
+// If you want to disable tracing, use Tracer(tracer.Discard) instead.
+// It sends the input to the next handler.
 func Silent(s bool) Handler {
 	return HandlerFunc(func(c *Context, in any) (any, error) {
 		c.Silent(s)
@@ -80,7 +95,9 @@ func Silent(s bool) Handler {
 	})
 }
 
-// Tracer returns a Handler that sets the tracer
+// Tracer returns a Handler that sets the tracer.
+// If you want to disable tracing, use Tracer(tracer.Discard).
+// It sends the input to the next handler.
 func Tracer(t tracer.Tracer) Handler {
 	return HandlerFunc(func(c *Context, in any) (any, error) {
 		c.Tracer(t)
@@ -88,7 +105,10 @@ func Tracer(t tracer.Tracer) Handler {
 	})
 }
 
-// WithReader returns a Handler that sets the reader
+// WithReader returns a Handler that sets the reader.
+// If you want to read from a file, use Cat instead.
+// If you want to read from a string, use Echo instead.
+// It drops the input and sends the io.Reader to the next handler.
 func WithReader(r io.Reader) Handler {
 	var (
 		name = "~with_reader"
@@ -107,7 +127,10 @@ func WithReader(r io.Reader) Handler {
 	})
 }
 
-// Echo returns a Handler that echoes the string
+// Echo returns a Handler that echoes the string.
+// If you want to read from a file, use Cat instead.
+// If you want to read from a reader, use WithReader instead.
+// It drops the input and sends the string(converted to io.Reader) to the next handler.
 func Echo(s string) Handler {
 	return HandlerFunc(func(c *Context, _ any) (any, error) {
 		c.Tracer().Trace("~echo", s)
@@ -115,7 +138,13 @@ func Echo(s string) Handler {
 	})
 }
 
-// Exec returns a Handler that executes a command
+// Exec returns a Handler that executes a command.
+// It uses exec.CommandContext to execute the command.
+//   - stdin is set to the input.
+//   - stdout is sent to the next handler.
+//   - stderr is sent to os.Stderr if silent is false.
+//
+// It starts the command and waits after the next handler is called.
 func Exec(name string, args ...string) Handler {
 	return HandlerFunc(func(c *Context, in any) (any, error) {
 		c.Tracer().Trace(name, args...)
@@ -152,7 +181,9 @@ func Exec(name string, args ...string) Handler {
 	})
 }
 
-// Execs returns a Handler that executes a command
+// Execs returns a Handler that executes a command.
+// It uses shell.Fields to parse the command.
+// It is a shortcut for Exec(shell.Fields(cmd)).
 func Execs(cmd string) Handler {
 	return HandlerFunc(func(c *Context, in any) (any, error) {
 		args, err := shell.Fields(cmd, nil)
@@ -164,13 +195,15 @@ func Execs(cmd string) Handler {
 	})
 }
 
-// Execf returns a Handler that executes a command
-// It is a shortcut for Execs(fmt.Sprintf(format, a...))
+// Execf returns a Handler that executes a command.
+// It is a shortcut for Execs(fmt.Sprintf(format, a...)).
 func Execf(format string, a ...any) Handler {
 	return Execs(fmt.Sprintf(format, a...))
 }
 
-// Tee returns a Handler that writes to multiple writers
+// Tee returns a Handler that writes to multiple writers.
+// It uses io.Copy to copy the input to the writers
+// and sends the input to the next handler.
 func Tee(w ...io.Writer) Handler {
 	var (
 		name = "~tee"
@@ -212,7 +245,7 @@ func Tee(w ...io.Writer) Handler {
 	})
 }
 
-// writeFileWithFlag returns a Handler that writes to a file with flag
+// writeFileWithFlag returns a Handler that writes to a file with flag.
 func writeFileWithFlag(name string, flag int, path ...string) Handler {
 	if len(path) == 0 {
 		panic("no path specified")
@@ -243,6 +276,10 @@ func writeFileWithFlag(name string, flag int, path ...string) Handler {
 			ww = append(ww, f)
 		}
 
+		// copy to buffer
+		var buf bytes.Buffer
+		ww = append(ww, &buf)
+
 		_, err := io.Copy(io.MultiWriter(ww...), r)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to write to file")
@@ -252,21 +289,31 @@ func writeFileWithFlag(name string, flag int, path ...string) Handler {
 			_ = f.Close()
 		}
 
-		return nil, nil
+		return &buf, nil
 	})
 }
 
-// WriteFile returns a Handler that writes to a file
+// WriteFile returns a Handler that writes to a file.
+// If the file does not exist, it will be created.
+// If the file exists, it will be truncated.
+// If you want to append to a file, use AppendFile instead.
+// It sends the input to the next handler.
 func WriteFile(path ...string) Handler {
 	return writeFileWithFlag("~write_file", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, path...)
 }
 
-// AppendFile returns a Handler that appends to a file
+// AppendFile returns a Handler that appends to a file.
+// If the file does not exist, it will be created.
+// If the file exists, it will be appended.
+// If you want to truncate the file, use WriteFile instead.
+// It sends the input to the next handler.
 func AppendFile(path ...string) Handler {
 	return writeFileWithFlag("~append_file", os.O_WRONLY|os.O_CREATE|os.O_APPEND, path...)
 }
 
-// Unmarshal returns a Handler that unmarshal the input
+// Unmarshal returns a Handler that unmarshal the input.
+// It uses the parser.Parser to unmarshal the input to v.
+// It sends v to the next handler.
 func Unmarshal(p parser.Parser, v any) Handler {
 	var (
 		name = "~unmarshal"
@@ -308,7 +355,9 @@ func Unmarshal(p parser.Parser, v any) Handler {
 	})
 }
 
-// IfExists returns a Handler that checks if the file exists
+// IfExists returns a Handler that checks if the file exists.
+// If the file does not exist, it returns an error.
+// If the file exists, it sends the input to the next handler.
 func IfExists(path ...string) Handler {
 	name := "~if_exists"
 	args := path
@@ -328,7 +377,8 @@ func IfExists(path ...string) Handler {
 	})
 }
 
-// Cat returns a Handler that reads a file
+// Cat returns a Handler that reads a file.
+// It drops the input and sends the file content (io.Reader) to the next handler.
 func Cat(path string) Handler {
 	name := "~cat"
 	args := []string{path}
@@ -346,7 +396,7 @@ func Cat(path string) Handler {
 	})
 }
 
-// Sed returns a Handler that applies the callback function to each line
+// Sed returns a Handler that applies the callback function to each line.
 func Sed(cb func(i int, line string) string) Handler {
 	name := "~sed"
 	args := []string{fmt.Sprintf("<%T>", cb)}
