@@ -2,7 +2,7 @@
 lint:
 	go generate ./...
 	go mod tidy
-	golines -m 100 -l -w .
+	golines -m 100 -w .
 	golangci-lint run --fix ./...
 	go list -f '{{ range .GoFiles }}{{ if eq $$.Name "main" }}{{ printf "%s/%s\n" $$.Dir . }}{{ end }}{{ end }}' ./... | xargs -I {} golangci-lint run --fix {}
 
