@@ -53,7 +53,7 @@ func Recover() Handler {
 				if e, ok := r.(error); ok {
 					err = errors.Wrap(e, "recovered from panic")
 				} else {
-					err = errors.Newf("panic: %v", r)
+					err = errors.Newf("recovered from panic: %v", r)
 				}
 			}
 		}()
@@ -208,7 +208,7 @@ func Tee(w ...io.Writer) Handler {
 		var buf bytes.Buffer
 		w = append(w, &buf)
 		_, err := io.Copy(io.MultiWriter(w...), r)
-		return &buf, err
+		return &buf, errors.Wrap(err, "failed to copy")
 	})
 }
 
