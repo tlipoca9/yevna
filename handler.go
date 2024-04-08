@@ -69,7 +69,7 @@ func Recover() Handler {
 
 // Cd returns a Handler that changes the working directory.
 // It uses IfExists to check if the path exists.
-// It sends the input to the next handler.
+// It sends input to next handler.
 func Cd(path string) Handler {
 	name := "~cd"
 	args := []string{path}
@@ -87,7 +87,7 @@ func Cd(path string) Handler {
 // Silent returns a Handler that sets the silent flag.
 // If silent is true, Exec will not print stderr.
 // If you want to disable tracing, use Tracer(tracer.Discard) instead.
-// It sends the input to the next handler.
+// It sends input to next handler.
 func Silent(s bool) Handler {
 	return HandlerFunc(func(c *Context, in any) (any, error) {
 		c.Silent(s)
@@ -97,7 +97,7 @@ func Silent(s bool) Handler {
 
 // Tracer returns a Handler that sets the tracer.
 // If you want to disable tracing, use Tracer(tracer.Discard).
-// It sends the input to the next handler.
+// It sends input to next handler.
 func Tracer(t tracer.Tracer) Handler {
 	return HandlerFunc(func(c *Context, in any) (any, error) {
 		c.Tracer(t)
@@ -108,7 +108,7 @@ func Tracer(t tracer.Tracer) Handler {
 // WithReader returns a Handler that sets the reader.
 // If you want to read from a file, use Cat instead.
 // If you want to read from a string, use Echo instead.
-// It drops the input and sends the io.Reader to the next handler.
+// It drops the input and sends io.Reader to next handler.
 func WithReader(r io.Reader) Handler {
 	var (
 		name = "~with_reader"
@@ -130,7 +130,7 @@ func WithReader(r io.Reader) Handler {
 // Echo returns a Handler that echoes the string.
 // If you want to read from a file, use Cat instead.
 // If you want to read from a reader, use WithReader instead.
-// It drops the input and sends the string(converted to io.Reader) to the next handler.
+// It drops the input and sends string(converted to io.Reader) to next handler.
 func Echo(s string) Handler {
 	return HandlerFunc(func(c *Context, _ any) (any, error) {
 		c.Tracer().Trace("~echo", s)
@@ -141,7 +141,7 @@ func Echo(s string) Handler {
 // Exec returns a Handler that executes a command.
 // It uses exec.CommandContext to execute the command.
 //   - stdin is set to the input.
-//   - stdout is sent to the next handler.
+//   - stdout is sent to next handler.
 //   - stderr is sent to os.Stderr if silent is false.
 //
 // It starts the command and waits after the next handler is called.
@@ -203,7 +203,7 @@ func Execf(format string, a ...any) Handler {
 
 // Tee returns a Handler that writes to multiple writers.
 // It uses io.Copy to copy the input to the writers
-// and sends the input to the next handler.
+// and sends input to next handler.
 func Tee(w ...io.Writer) Handler {
 	var (
 		name = "~tee"
@@ -297,7 +297,7 @@ func writeFileWithFlag(name string, flag int, path ...string) Handler {
 // If the file does not exist, it will be created.
 // If the file exists, it will be truncated.
 // If you want to append to a file, use AppendFile instead.
-// It sends the input to the next handler.
+// It sends input to next handler.
 func WriteFile(path ...string) Handler {
 	return writeFileWithFlag("~write_file", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, path...)
 }
@@ -306,14 +306,14 @@ func WriteFile(path ...string) Handler {
 // If the file does not exist, it will be created.
 // If the file exists, it will be appended.
 // If you want to truncate the file, use WriteFile instead.
-// It sends the input to the next handler.
+// It sends input to next handler.
 func AppendFile(path ...string) Handler {
 	return writeFileWithFlag("~append_file", os.O_WRONLY|os.O_CREATE|os.O_APPEND, path...)
 }
 
 // Unmarshal returns a Handler that unmarshal the input.
 // It uses the parser.Parser to unmarshal the input to v.
-// It sends v to the next handler.
+// It sends v to next handler.
 func Unmarshal(p parser.Parser, v any) Handler {
 	var (
 		name = "~unmarshal"
@@ -357,7 +357,7 @@ func Unmarshal(p parser.Parser, v any) Handler {
 
 // IfExists returns a Handler that checks if the file exists.
 // If the file does not exist, it returns an error.
-// If the file exists, it sends the input to the next handler.
+// If the file exists, it sends input to next handler.
 func IfExists(path ...string) Handler {
 	name := "~if_exists"
 	args := path
@@ -378,7 +378,7 @@ func IfExists(path ...string) Handler {
 }
 
 // Cat returns a Handler that reads a file.
-// It drops the input and sends the file content (io.Reader) to the next handler.
+// It drops the input and sends file content (io.Reader) to next handler.
 func Cat(path string) Handler {
 	name := "~cat"
 	args := []string{path}
