@@ -8,8 +8,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/goccy/go-json"
+	"github.com/imroc/req/v3"
 
 	"github.com/tlipoca9/yevna"
 	"github.com/tlipoca9/yevna/parser"
@@ -162,6 +164,21 @@ var _ = Describe("Handler", func() {
 				Expect(err).To(BeNil())
 				Expect(got).To(Equal(ipInfoMap))
 			})
+		})
+	})
+
+	Context("HTTP", func() {
+		It("should success", func() {
+			var got map[string]any
+			err := y.Run(
+				context.Background(),
+				yevna.HTTP().MakeRequest(func(c *req.Client, _ any) *req.Request {
+					return c.SetTimeout(time.Second).Get(svc.URL + "/ipinfo")
+				}),
+				yevna.Unmarshal(parser.JSON(), &got),
+			)
+			Expect(err).To(BeNil())
+			Expect(got).To(Equal(ipInfoMap))
 		})
 	})
 })
