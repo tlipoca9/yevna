@@ -195,4 +195,20 @@ var _ = Describe("Handler", func() {
 			Expect(got).To(Equal([]string{"Alice", "Bob"}))
 		})
 	})
+
+	Context("OpenFile", func() {
+		It("should success", func() {
+			var got map[string]any
+			err := y.Run(
+				context.Background(),
+				yevna.OpenFile("tests/test.json"),
+				yevna.Unmarshal(parser.JSON(), &got),
+			)
+			Expect(err).To(BeNil())
+			Expect(got).To(Equal(map[string]any{
+				"name":  "Alice",
+				"value": 42.,
+			}))
+		})
+	})
 })

@@ -294,6 +294,28 @@ func writeFileWithFlag(name string, flag int, path ...string) Handler {
 	})
 }
 
+// OpenFile returns a Handler that opens a file.
+// It sends input to next handler.
+func OpenFile(path string) Handler {
+	name := "~open_file"
+	return HandlerFunc(func(c *Context, in any) (any, error) {
+		if filepath.IsLocal(path) {
+			path = filepath.Join(c.Workdir(), path)
+		}
+		c.Tracer().Trace(name, path)
+		f, err := os.Open(path)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to open file")
+		}
+
+		out, err := c.Next(f)
+
+		_ = f.Close()
+
+		return out, err
+	})
+}
+
 // WriteFile returns a Handler that writes to a file.
 // If the file does not exist, it will be created.
 // If the file exists, it will be truncated.
