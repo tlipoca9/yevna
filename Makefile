@@ -16,5 +16,5 @@ bench:
 
 .PHONY: install-tools
 install-tools:
-	command -v golines || go install github.com/segmentio/golines@latest
-	command -v ginkgo || go install github.com/onsi/ginkgo/v2/ginkgo@v2.17.1
+	go install github.com/segmentio/golines@latest
+	go install github.com/onsi/ginkgo/v2/ginkgo
