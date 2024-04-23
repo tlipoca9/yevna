@@ -82,11 +82,11 @@ var _ = Describe("Handler", func() {
 				context.Background(),
 				yevna.Silent(true),
 				yevna.Exec("curl", svc.URL+"/ipinfo"),
-				yevna.Exec("jq", ".ip"),
+				yevna.Gjson("ip"),
 				yevna.Tee(buf),
 			)
 			Expect(err).To(BeNil())
-			Expect(buf.String()).To(Equal(`"1.1.1.1"` + "\n"))
+			Expect(buf.String()).To(Equal(`"1.1.1.1"`))
 		})
 	})
 
