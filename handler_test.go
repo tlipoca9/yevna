@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gin-gonic/gin"
+	"github.com/goccy/go-json"
 
 	"github.com/tlipoca9/yevna"
 	"github.com/tlipoca9/yevna/parser"
@@ -36,10 +36,16 @@ var (
 )
 
 var _ = BeforeSuite(func() {
-	gin.SetMode(gin.ReleaseMode)
-	g := gin.New()
-	g.GET("/ipinfo", func(c *gin.Context) {
-		c.JSON(http.StatusOK, ipInfoMap)
+	g := http.NewServeMux()
+	g.HandleFunc("/ipinfo", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json")
+		buf, err := json.Marshal(ipInfoMap)
+		if err != nil {
+			_, _ = w.Write([]byte(err.Error()))
+			return
+		}
+		_, _ = w.Write(buf)
 	})
 	svc = httptest.NewServer(g)
 })
