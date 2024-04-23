@@ -11,6 +11,7 @@ import (
 	"slices"
 
 	"github.com/cockroachdb/errors"
+	"github.com/tidwall/gjson"
 	"mvdan.cc/sh/v3/shell"
 
 	"github.com/tlipoca9/yevna/parser"
@@ -423,6 +424,50 @@ func Sed(cb func(i int, line string) string) Handler {
 		if err := scanner.Err(); err != nil {
 			return nil, errors.Wrap(err, "failed to scan")
 		}
+
+		return &buf, nil
+	})
+}
+
+// Gjson returns a Handler that extracts the value using the path.
+func Gjson(path string) Handler {
+	name := "~gjson"
+	args := []string{path}
+	return HandlerFunc(func(c *Context, in any) (any, error) {
+		if in == nil {
+			return nil, errors.New("input is nil")
+		}
+		var b []byte
+		switch x := in.(type) {
+		case io.Reader:
+			var err error
+			b, err = io.ReadAll(x)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to read")
+			}
+		case []byte:
+			b = x
+		case string:
+			b = []byte(x)
+		case fmt.Stringer:
+			b = []byte(x.String())
+		default:
+			return nil, errors.Newf("input cannot be '%T'", in)
+		}
+
+		c.Tracer().Trace(name, args...)
+
+		if !gjson.ValidBytes(b) {
+			return nil, errors.New("invalid json")
+		}
+
+		var buf bytes.Buffer
+
+		value := gjson.GetBytes(b, path)
+		if !value.Exists() {
+			return nil, errors.New("path not found")
+		}
+		buf.WriteString(value.Raw)
 
 		return &buf, nil
 	})

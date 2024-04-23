@@ -181,4 +181,18 @@ var _ = Describe("Handler", func() {
 			Expect(got).To(Equal(ipInfoMap))
 		})
 	})
+
+	Context("Gjson", func() {
+		It("should success", func() {
+			var got []string
+			err := y.Run(
+				context.Background(),
+				yevna.Echo(`[{"name": "Alice"}, {"name": "Bob"}]`),
+				yevna.Gjson("#.name"),
+				yevna.Unmarshal(parser.JSON(), &got),
+			)
+			Expect(err).To(BeNil())
+			Expect(got).To(Equal([]string{"Alice", "Bob"}))
+		})
+	})
 })
