@@ -25,6 +25,10 @@ type ExecTracerOption func(*ExecTracer)
 func WithSecret(secretAndMasks ...string) ExecTracerOption {
 	secrets := make(map[string]string)
 	for i := 0; i < len(secretAndMasks); i += 2 {
+		if i+1 >= len(secretAndMasks) {
+			secrets[secretAndMasks[i]] = "******"
+			break
+		}
 		secrets[secretAndMasks[i]] = secretAndMasks[i+1]
 	}
 	return func(t *ExecTracer) {
