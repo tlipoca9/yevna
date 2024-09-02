@@ -28,7 +28,6 @@ func (h *HttpHandler) MakeRequest(fn func(c *req.Client, in any) *req.Request) *
 func (h *HttpHandler) Handle(c *Context, in any) (any, error) {
 	reqC := h.reqClient.Clone()
 	reqC.OnBeforeRequest(func(_ *req.Client, r *req.Request) error {
-		c.Tracer().Trace("~http", r.Method, r.RawURL)
 		return nil
 	})
 

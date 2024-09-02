@@ -15,7 +15,6 @@ import (
 
 	"github.com/tlipoca9/yevna"
 	"github.com/tlipoca9/yevna/parser"
-	"github.com/tlipoca9/yevna/tracer"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -55,7 +54,6 @@ var _ = BeforeSuite(func() {
 var _ = Describe("Handler", func() {
 	var buf *bytes.Buffer
 	y := yevna.New()
-	y.Tracer(tracer.Discard)
 
 	BeforeEach(func() {
 		buf = &bytes.Buffer{}

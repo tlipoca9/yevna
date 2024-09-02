@@ -2,10 +2,7 @@ package yevna
 
 import (
 	"context"
-	"os"
 	"sync/atomic"
-
-	"github.com/tlipoca9/yevna/tracer"
 )
 
 var defaultContext atomic.Pointer[Context]
@@ -23,7 +20,6 @@ func init() {
 		ErrorHandler(),
 		Recover(),
 	)
-	c.Tracer(tracer.NewExecTracer(os.Stderr))
 	SetDefault(c)
 }
 

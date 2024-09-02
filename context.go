@@ -3,14 +3,11 @@ package yevna
 import (
 	"context"
 	"path/filepath"
-
-	"github.com/tlipoca9/yevna/tracer"
 )
 
 type Context struct {
 	workdir string
 	silent  bool
-	tracer  tracer.Tracer
 
 	ctx context.Context
 
@@ -47,16 +44,6 @@ func (c *Context) Silent(s ...bool) bool {
 	return c.silent
 }
 
-func (c *Context) Tracer(t ...tracer.Tracer) tracer.Tracer {
-	if len(t) > 1 {
-		panic("too many arguments")
-	}
-	if len(t) == 1 {
-		c.tracer = t[0]
-	}
-	return c.tracer
-}
-
 func (c *Context) Next(in any) (any, error) {
 	c.index++
 	for c.index < len(c.handlers) {
@@ -73,7 +60,6 @@ func (c *Context) Next(in any) (any, error) {
 func (c *Context) copy() *Context {
 	cc := &Context{
 		silent:   c.silent,
-		tracer:   c.tracer,
 		workdir:  c.workdir,
 		index:    -1,
 		handlers: c.handlers.Copy(),
@@ -97,6 +83,5 @@ func (c *Context) Run(ctx context.Context, handlers ...Handler) error {
 func New() *Context {
 	return &Context{
 		silent: false,
-		tracer: tracer.Discard,
 	}
 }
