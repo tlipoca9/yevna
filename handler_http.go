@@ -1,44 +1,39 @@
 package yevna
 
 import (
-	"github.com/imroc/req/v3"
+	"net/http"
 )
 
-type HttpHandler struct {
-	reqClient *req.Client
-	makeReq   func(c *req.Client, in any) *req.Request
+var DefaultHTTPClient = &HTTPClient{client: http.DefaultClient}
+
+type HTTPClient struct {
+	client *http.Client
 }
 
-func HTTP() *HttpHandler {
-	return &HttpHandler{
-		reqClient: req.C(),
-	}
-}
-
-func (h *HttpHandler) WithClient(client *req.Client) *HttpHandler {
-	h.reqClient = client
+func (h *HTTPClient) SetClient(client *http.Client) *HTTPClient {
+	h.client = client
 	return h
 }
 
-func (h *HttpHandler) MakeRequest(fn func(c *req.Client, in any) *req.Request) *HttpHandler {
-	h.makeReq = fn
-	return h
-}
+func (h *HTTPClient) Do(fn func(c *Context, in any) (*http.Request, error)) Handler {
+	return HandlerFunc(func(c *Context, in any) (any, error) {
+		req, err := fn(c, in)
+		if err != nil {
+			return nil, err
+		}
 
-func (h *HttpHandler) Handle(c *Context, in any) (any, error) {
-	reqC := h.reqClient.Clone()
-	reqC.OnBeforeRequest(func(_ *req.Client, r *req.Request) error {
-		return nil
+		resp, err := h.client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+
+		out, err := c.Next(resp.Body)
+
+		resp.Body.Close()
+		return out, err
 	})
+}
 
-	r := h.makeReq(reqC, in)
-	resp := r.Do(c.Context())
-	if resp.Err != nil {
-		return nil, resp.Err
-	}
-
-	out, err := c.Next(resp.Body)
-
-	resp.Body.Close()
-	return out, err
+func HTTP(fn func(c *Context, in any) (*http.Request, error)) Handler {
+	return DefaultHTTPClient.Do(fn)
 }

@@ -5,13 +5,9 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/goccy/go-json"
-	"github.com/imroc/req/v3"
 
 	"github.com/tlipoca9/yevna"
 	"github.com/tlipoca9/yevna/parser"
@@ -59,21 +55,6 @@ var _ = Describe("Handler", func() {
 		buf = &bytes.Buffer{}
 	})
 
-	Context("Cd", func() {
-		It("should change working directory for the command", func() {
-			wd, err := os.Getwd()
-			Expect(err).To(BeNil())
-			err = y.Run(
-				context.Background(),
-				yevna.Cd(filepath.Join(wd, "parser")),
-				yevna.Exec("pwd"),
-				yevna.Tee(buf),
-			)
-			Expect(err).To(BeNil())
-			Expect(buf.String()).To(Equal(filepath.Join(wd, "parser") + "\n"))
-		})
-	})
-
 	Context("Silent", func() {
 		It("should set the silent mode", func() {
 			err := y.Run(
@@ -88,28 +69,16 @@ var _ = Describe("Handler", func() {
 		})
 	})
 
-	Context("WithReader", func() {
+	Context("Input", func() {
 		It("should success", func() {
 			err := y.Run(
 				context.Background(),
-				yevna.WithReader(strings.NewReader("hello")),
+				yevna.Input(strings.NewReader("hello")),
 				yevna.Exec("cat"),
 				yevna.Tee(buf),
 			)
 			Expect(err).To(BeNil())
 			Expect(buf.String()).To(Equal(`hello`))
-		})
-	})
-
-	Context("Echo", func() {
-		It("should success", func() {
-			err := y.Run(
-				context.Background(),
-				yevna.Echo("hello"),
-				yevna.Tee(buf),
-			)
-			Expect(err).To(BeNil())
-			Expect(buf.String()).To(Equal("hello"))
 		})
 	})
 
@@ -170,8 +139,8 @@ var _ = Describe("Handler", func() {
 			var got map[string]any
 			err := y.Run(
 				context.Background(),
-				yevna.HTTP().MakeRequest(func(c *req.Client, _ any) *req.Request {
-					return c.SetTimeout(time.Second).Get(svc.URL + "/ipinfo")
+				yevna.HTTP(func(c *yevna.Context, in any) (*http.Request, error) {
+					return http.NewRequest(http.MethodGet, svc.URL+"/ipinfo", nil)
 				}),
 				yevna.Unmarshal(parser.JSON(), &got),
 			)
@@ -185,7 +154,7 @@ var _ = Describe("Handler", func() {
 			var got []string
 			err := y.Run(
 				context.Background(),
-				yevna.Echo(`[{"name": "Alice"}, {"name": "Bob"}]`),
+				yevna.Input(`[{"name": "Alice"}, {"name": "Bob"}]`),
 				yevna.Gjson("#.name"),
 				yevna.Unmarshal(parser.JSON(), &got),
 			)
