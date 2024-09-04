@@ -17,6 +17,8 @@ func Reader(a any) (io.Reader, error) {
 		return obj, nil
 	case []byte:
 		return bytes.NewBuffer(obj), nil
+	case []rune:
+		return bytes.NewBufferString(string(obj)), nil
 	case string:
 		return bytes.NewBufferString(obj), nil
 	case fmt.Stringer:
