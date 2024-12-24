@@ -73,7 +73,7 @@ func (p *CsvParser) Unmarshal(b []byte, v any) error {
 		}
 		results = append(results, m)
 	}
-	if err != nil && !errors.Is(err, io.EOF) {
+	if !errors.Is(err, io.EOF) {
 		return errors.Wrapf(err, "read record failed")
 	}
 

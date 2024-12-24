@@ -12,7 +12,7 @@ import (
 
 // Gjson returns a Handler that extracts the value using the path.
 func Gjson(path string) Handler {
-	return HandlerFunc(func(c *Context, in any) (any, error) {
+	return HandlerFunc(func(_ *Context, in any) (any, error) {
 		r, err := utils.Reader(in)
 		if err != nil {
 			return nil, err

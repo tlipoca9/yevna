@@ -51,7 +51,7 @@ func Recover() Handler {
 //   - io.Reader: reads the reader and returns the string.
 //   - any other type: uses fmt.Sprint to convert to string.
 func ToStr() Handler {
-	return HandlerFunc(func(c *Context, in any) (any, error) {
+	return HandlerFunc(func(_ *Context, in any) (any, error) {
 		switch v := in.(type) {
 		case string:
 			return v, nil
@@ -109,7 +109,7 @@ func Silent(s bool) Handler {
 // Input returns a Handler that sets the input.
 // It sends the input to next handler.
 func Input(a any) Handler {
-	return HandlerFunc(func(c *Context, _ any) (any, error) {
+	return HandlerFunc(func(_ *Context, _ any) (any, error) {
 		return a, nil
 	})
 }
@@ -117,7 +117,7 @@ func Input(a any) Handler {
 // Output returns a Handler that assigns the previous handler's output to a.
 // If successful, it sends original input to the next handler.
 func Output[T any](a *T) Handler {
-	return HandlerFunc(func(c *Context, in any) (any, error) {
+	return HandlerFunc(func(_ *Context, in any) (any, error) {
 		switch v := in.(type) {
 		case T:
 			*a = v
@@ -134,7 +134,7 @@ func Output[T any](a *T) Handler {
 // It uses io.Copy to copy the input to the writers
 // and sends input to next handler.
 func Tee(w ...io.Writer) Handler {
-	return HandlerFunc(func(c *Context, in any) (any, error) {
+	return HandlerFunc(func(_ *Context, in any) (any, error) {
 		r, err := utils.Reader(in)
 		if err != nil {
 			return nil, err
@@ -151,7 +151,7 @@ func Tee(w ...io.Writer) Handler {
 // It uses the parser.Parser to unmarshal the input to v.
 // It sends v to next handler.
 func Unmarshal[T any](p parser.Parser, v *T) Handler {
-	return HandlerFunc(func(c *Context, in any) (any, error) {
+	return HandlerFunc(func(_ *Context, in any) (any, error) {
 		r, err := utils.Reader(in)
 		if err != nil {
 			return nil, err
@@ -172,9 +172,26 @@ func Unmarshal[T any](p parser.Parser, v *T) Handler {
 	})
 }
 
+// Marshal returns a Handler that marshal the input.
+func Marshal(m func(any) ([]byte, error), v ...any) Handler {
+	if len(v) > 1 {
+		panic("too many arguments")
+	}
+	return HandlerFunc(func(_ *Context, in any) (any, error) {
+		if len(v) == 1 {
+			in = v[0]
+		}
+		b, err := m(in)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to marshal")
+		}
+		return b, nil
+	})
+}
+
 // ForEachLine returns a Handler that applies the callback function to each line.
 func ForEachLine(cb func(i int, line string) string) Handler {
-	return HandlerFunc(func(c *Context, in any) (any, error) {
+	return HandlerFunc(func(_ *Context, in any) (any, error) {
 		r, err := utils.Reader(in)
 		if err != nil {
 			return nil, err
@@ -199,7 +216,7 @@ func ForEachLine(cb func(i int, line string) string) Handler {
 // OpenFile returns a Handler that opens a file.
 // It sends input to next handler.
 func OpenFile(path string) Handler {
-	return HandlerFunc(func(c *Context, in any) (any, error) {
+	return HandlerFunc(func(c *Context, _ any) (any, error) {
 		if filepath.IsLocal(path) {
 			path = filepath.Join(c.Workdir(), path)
 		}
