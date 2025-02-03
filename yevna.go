@@ -23,6 +23,7 @@ func init() {
 	SetDefault(c)
 }
 
+// Run executes the handlers in the default context.
 func Run(ctx context.Context, handlers ...Handler) error {
 	return Default().Run(ctx, handlers...)
 }

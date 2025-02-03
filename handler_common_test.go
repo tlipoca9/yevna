@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/tlipoca9/yevna"
@@ -26,14 +27,28 @@ var _ = Describe("Common Handlers", func() {
 		It("should change working directory for the command", func(ctx context.Context) {
 			wd, err := os.Getwd()
 			Expect(err).To(BeNil())
-			err = y.Run(
-				ctx,
-				yevna.Chdir(filepath.Join(wd, "parser")),
-				yevna.Exec("pwd"),
-				yevna.Tee(buf),
-			)
-			Expect(err).To(BeNil())
-			Expect(buf.String()).To(Equal(filepath.Clean(filepath.Join(wd, "parser")) + "\n"))
+
+			// Check if windows
+			switch runtime.GOOS {
+			case "windows":
+				err = y.Run(
+					ctx,
+					yevna.Chdir(filepath.Join(wd, "parser")),
+					yevna.Exec("powershell", "-c", "Get-Location | Select-Object -ExpandProperty Path"),
+					yevna.Tee(buf),
+				)
+				Expect(err).To(BeNil())
+				Expect(buf.String()).To(Equal(filepath.Clean(filepath.Join(wd, "parser")) + "\r\n"))
+			default:
+				err = y.Run(
+					ctx,
+					yevna.Chdir(filepath.Join(wd, "parser")),
+					yevna.Exec("pwd"),
+					yevna.Tee(buf),
+				)
+				Expect(err).To(BeNil())
+				Expect(buf.String()).To(Equal(filepath.Clean(filepath.Join(wd, "parser")) + "\n"))
+			}
 		})
 	})
 
@@ -110,4 +125,21 @@ var _ = Describe("Common Handlers", func() {
 			}))
 		})
 	})
+
+	Context("Handler - WriteFile", func() {
+		It("should success", func(ctx context.Context) {
+			expectedContent := []byte(`{"name":"Alice","value":42}`)
+			err := y.Run(
+				ctx,
+				yevna.Input(expectedContent),
+				yevna.WriteFile("tests/write_tmp.json"),
+			)
+			Expect(err).To(BeNil())
+			// Check if the file was written correctly
+			fileContent, err := os.ReadFile("tests/write_tmp.json")
+			Expect(err).To(BeNil())
+			Expect(fileContent).To(Equal(expectedContent))
+		})
+	})
+
 })
